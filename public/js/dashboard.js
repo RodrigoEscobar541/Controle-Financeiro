@@ -1,5 +1,5 @@
 import { db } from './firebase-config.js';
-import { fmtBRL, fmtDate, mesAtualId, idToLabel } from './app.js';
+import { fmtBRL, fmtDate, mesAtualId, idToLabel, mesAtualLabel } from './app.js';
 import {
   collection, query, orderBy, limit, getDocs, doc, getDoc
 } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
@@ -10,6 +10,7 @@ export async function initDashboard() {
     carregarUltimasSaidas(),
     carregarUltimasEntradas(),
     carregarOrcamentoMensal(),
+    carregarOrcamentoProximoMes(),
     carregarContasCasaMes(),
     carregarTotalInvestimentos()
   ]);
@@ -73,16 +74,37 @@ async function carregarUltimasEntradas() {
   }
 }
 
+function proximoMesId() {
+  const now     = new Date();
+  const proximo = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+  return `${proximo.getFullYear()}-${String(proximo.getMonth() + 1).padStart(2, '0')}`;
+}
+
 async function carregarOrcamentoMensal() {
-  const el = document.getElementById('dash-orcamento');
+  const el      = document.getElementById('dash-orcamento');
+  const labelEl = document.getElementById('dash-orcamento-label');
   try {
     const mesId = mesAtualId();
-    const docRef = doc(db, 'distribuicao_mensal', mesId);
-    const snap = await getDoc(docRef);
-    if (!snap.exists()) { el.textContent = 'R$ 0,00'; return; }
+    if (labelEl) labelEl.textContent = idToLabel(mesId);
+    const snap  = await getDoc(doc(db, 'distribuicao_mensal', mesId));
+    if (!snap.exists()) { el.textContent = 'Não cadastrado'; return; }
+    const total = Object.values(snap.data().colunas || {})
+      .reduce((sum, c) => sum + (parseFloat(c.valor) || 0), 0);
+    el.textContent = fmtBRL(total);
+  } catch {
+    el.textContent = '—';
+  }
+}
 
-    const data = snap.data();
-    const total = Object.values(data.colunas || {})
+async function carregarOrcamentoProximoMes() {
+  const el      = document.getElementById('dash-orcamento-proximo');
+  const labelEl = document.getElementById('dash-orcamento-proximo-label');
+  try {
+    const mesId = proximoMesId();
+    if (labelEl) labelEl.textContent = idToLabel(mesId);
+    const snap  = await getDoc(doc(db, 'distribuicao_mensal', mesId));
+    if (!snap.exists()) { el.textContent = 'Não cadastrado'; return; }
+    const total = Object.values(snap.data().colunas || {})
       .reduce((sum, c) => sum + (parseFloat(c.valor) || 0), 0);
     el.textContent = fmtBRL(total);
   } catch {
