@@ -200,43 +200,34 @@ function editarValor(mesId, colName) {
   );
 }
 
-function adicionarMes() {
-  openModal(
-    'Adicionar Mês',
-    `<div class="form-group">
-       <label>Mês</label>
-       <input type="month" id="add-mes-input" value="${mesAtualId()}" class="form-control">
-     </div>`,
-    async () => {
-      const mesId = document.getElementById('add-mes-input').value;
-      if (!mesId) { showToast('Selecione um mês.', 'error'); return; }
-      if (meses[mesId]) { showToast('Este mês já existe na tabela.', ''); return; }
+async function adicionarMes() {
+  const ids = Object.keys(meses).sort();
+  const ultimo = ids.length > 0 ? ids[ids.length - 1] : mesAtualId();
 
-      const colunasPadrao = {};
-      colunas.forEach(c => { colunasPadrao[c] = { valor: 0, status: 'naoPago' }; });
+  const [y, m] = ultimo.split('-').map(Number);
+  const proximo = new Date(y, m, 1); // m (0-indexed) = mês seguinte
+  const mesId = `${proximo.getFullYear()}-${String(proximo.getMonth() + 1).padStart(2, '0')}`;
 
-      try {
-        await setDoc(doc(db, 'distribuicao_mensal', mesId), {
-          dataMes: mesIdToLabel(mesId),
-          colunas: colunasPadrao
-        });
+  if (meses[mesId]) { showToast(`${idToLabel(mesId)} já existe.`, ''); return; }
 
-        // Expande o filtro automaticamente se o mês estiver fora do período
-        let changed = false;
-        if (mesId < filtroInicio) { filtroInicio = mesId; changed = true; }
-        if (mesId > filtroFim)    { filtroFim    = mesId; changed = true; }
-        if (changed) {
-          document.getElementById('dist-filtro-inicio').value = filtroInicio;
-          document.getElementById('dist-filtro-fim').value    = filtroFim;
-        }
+  const colunasPadrao = {};
+  colunas.forEach(c => { colunasPadrao[c] = { valor: 0, status: 'naoPago' }; });
 
-        showToast(`${idToLabel(mesId)} adicionado!`, 'success');
-      } catch {
-        showToast('Erro ao adicionar mês.', 'error');
-      }
-    },
-    'Adicionar'
-  );
+  try {
+    await setDoc(doc(db, 'distribuicao_mensal', mesId), {
+      dataMes: mesIdToLabel(mesId),
+      colunas: colunasPadrao
+    });
+
+    if (mesId > filtroFim) {
+      filtroFim = mesId;
+      document.getElementById('dist-filtro-fim').value = filtroFim;
+    }
+
+    showToast(`${idToLabel(mesId)} adicionado!`, 'success');
+  } catch {
+    showToast('Erro ao adicionar mês.', 'error');
+  }
 }
 
 function adicionarColuna() {
