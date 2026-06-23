@@ -625,6 +625,65 @@ input, select, textarea { font-family: inherit; font-size: inherit; }
   background: rgba(21, 101, 192, 0.12);
 }
 
+/* ============================================================
+   ANOTAÇÕES
+   ============================================================ */
+.notas-card {
+  background: var(--card);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  margin-top: 1.25rem;
+  overflow: hidden;
+  border-left: 4px solid #F9A825;
+}
+
+.notas-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1.25rem 0.5rem;
+}
+
+.notas-icon {
+  font-size: 1rem;
+}
+
+.notas-title {
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: var(--text);
+  flex: 1;
+}
+
+.notas-status {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  transition: color 0.2s;
+}
+
+.notas-status.saved  { color: var(--success); }
+.notas-status.error  { color: var(--danger); }
+
+.notas-textarea {
+  width: 100%;
+  min-height: 90px;
+  max-height: 300px;
+  padding: 0.5rem 1.25rem 1rem;
+  border: none;
+  outline: none;
+  resize: vertical;
+  font-size: 0.9rem;
+  color: var(--text);
+  background: transparent;
+  line-height: 1.6;
+  font-family: inherit;
+}
+
+.notas-textarea::placeholder {
+  color: #B0BEC5;
+  font-style: italic;
+}
+
 /* Two column layout for banco */
 .tables-2col {
   display: grid;

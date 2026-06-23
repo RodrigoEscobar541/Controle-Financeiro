@@ -4,6 +4,7 @@ import { initDistribuicao} from './distribuicao.js';
 import { initPatrimonio }  from './patrimonio.js';
 import { initContasCasa }  from './contas-casa.js';
 import { auth, onAuthStateChanged } from './auth.js';
+import { initNotas }       from './notas.js';
 
 // ──────────────────────────────────────────────
 // UTILIDADES GLOBAIS
@@ -109,6 +110,7 @@ function activateSection(name) {
     if (name === 'distribuicao') initDistribuicao();
     if (name === 'patrimonio')   initPatrimonio();
     if (name === 'contas-casa')  initContasCasa();
+    initNotas(name);
   }
 }
 
