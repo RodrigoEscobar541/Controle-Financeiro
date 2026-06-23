@@ -115,8 +115,8 @@ function renderTabela() {
       const pago = cell.status === 'Pago';
       return `<td>
         <div class="cell-data ${pago ? 'pago' : ''}" data-mes="${mesId}" data-col="${col}"
-             title="Clique: editar valor | Duplo clique: marcar Pago">
-          ${fmtBRL(valor)}
+             title="Clique: editar valor | Segure 1s: marcar Pago">
+          ${valor !== 0 ? fmtBRL(valor) : ''}
         </div>
       </td>`;
     }).join('');
