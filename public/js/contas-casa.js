@@ -9,12 +9,6 @@
  *   Coleção: config
  *   Documento "contas_casa_colunas":
  *     { colunas: { "Mercado": { defaultPagante: "Digo" }, ... }, ordem: ["Mercado","Luz",...] }
- *
- * Colunas fixas no HTML: Data | [dinâmicas] | Bella | Digo | Total
- * Botão "Salvar" persiste todas as edições de uma vez.
- * Clique simples: toggle status (verde/branco)
- * Duplo clique: editar valor e pagante
- * Arrastar cabeçalho de coluna: reordena e salva no BD
  */
 
 import { db } from './firebase-config.js';
@@ -23,18 +17,40 @@ import {
   collection, doc, setDoc, onSnapshot, deleteField, updateDoc
 } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
 
-let colunasConfig = {};  // { nome: { defaultPagante } }
-let colunasOrdem  = [];  // array com os nomes na ordem de exibição
+let colunasConfig = {};
+let colunasOrdem  = [];
 let meses         = {};
-let pendingChanges= {};
 let unsubMeses    = null;
 let unsubConf     = null;
+let filtroInicio  = '';
+let filtroFim     = '';
 
 export function initContasCasa() {
-  document.getElementById('btn-add-mes-casa').addEventListener('click', adicionarMesAtual);
+  calcDefaultFiltro();
+
+  const inputInicio = document.getElementById('casa-filtro-inicio');
+  const inputFim    = document.getElementById('casa-filtro-fim');
+  inputInicio.value = filtroInicio;
+  inputFim.value    = filtroFim;
+
+  inputInicio.addEventListener('change', () => { filtroInicio = inputInicio.value; renderTabela(); });
+  inputFim.addEventListener('change',    () => { filtroFim    = inputFim.value;    renderTabela(); });
+
+  document.getElementById('btn-add-mes-casa').addEventListener('click', adicionarMes);
   document.getElementById('btn-add-col-casa').addEventListener('click', adicionarColuna);
-  document.getElementById('btn-save-casa').addEventListener('click', salvarAlteracoes);
+
   subscribeConfig();
+}
+
+// ────────────────────────────────────────────
+// FILTRO DE PERÍODO
+// ────────────────────────────────────────────
+function calcDefaultFiltro() {
+  const now    = new Date();
+  const inicio = new Date(now.getFullYear(), now.getMonth() - 5, 1);
+  filtroInicio = `${inicio.getFullYear()}-${String(inicio.getMonth() + 1).padStart(2, '0')}`;
+  const fim    = new Date(now.getFullYear(), now.getMonth() + 10, 1);
+  filtroFim    = `${fim.getFullYear()}-${String(fim.getMonth() + 1).padStart(2, '0')}`;
 }
 
 // ────────────────────────────────────────────
@@ -45,7 +61,6 @@ function subscribeConfig() {
     const data    = snap.exists() ? snap.data() : {};
     colunasConfig = data.colunas || {};
 
-    // Reconstrói a ordem: respeita o array salvo, acrescenta novas chaves no final
     const allKeys    = Object.keys(colunasConfig);
     const savedOrdem = Array.isArray(data.ordem) ? data.ordem : [];
     colunasOrdem = [
@@ -62,7 +77,6 @@ function subscribeMeses() {
   unsubMeses = onSnapshot(collection(db, 'contas_casa'), snap => {
     meses = {};
     snap.docs.forEach(d => { meses[d.id] = d.data(); });
-    pendingChanges = {};
     renderTabela();
   });
 }
@@ -76,9 +90,7 @@ function renderTabela() {
 
   const thCols = colunasOrdem.map(nome => {
     const pag = colunasConfig[nome]?.defaultPagante || '';
-    const tag = pag
-      ? `<span class="pagante-tag pagante-${pag.toLowerCase()}">${pag}</span>`
-      : '';
+    const tag = pag ? `<span class="pagante-tag pagante-${pag.toLowerCase()}">${pag}</span>` : '';
     return `<th draggable="true" data-col="${nome}">
       <span class="col-name">${nome}${tag}</span>
       <span class="delete-col-btn" data-col="${nome}" title="Remover" draggable="false">✕</span>
@@ -98,21 +110,21 @@ function renderTabela() {
 
   setupColDrag(thead);
 
-  const sortedIds = Object.keys(meses).sort().reverse();
+  const sortedIds = Object.keys(meses)
+    .filter(id => (!filtroInicio || id >= filtroInicio) && (!filtroFim || id <= filtroFim))
+    .sort().reverse();
 
   if (sortedIds.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="${colunasOrdem.length + 4}" class="empty-state">
-      Nenhum mês cadastrado. Clique em "+ Mês Atual" para começar.
-    </td></tr>`;
+    const msg = Object.keys(meses).length === 0
+      ? 'Nenhum mês cadastrado. Clique em "+ Mês" para começar.'
+      : 'Nenhum mês no período selecionado. Ajuste o filtro ou adicione um mês.';
+    tbody.innerHTML = `<tr><td colspan="${colunasOrdem.length + 4}" class="empty-state">${msg}</td></tr>`;
     document.getElementById('mes-atual-metade').textContent = 'R$ —';
     return;
   }
 
   tbody.innerHTML = sortedIds.map(mesId => {
-    const mes   = meses[mesId] || {};
-    const local = pendingChanges[mesId] || {};
-    const cols  = { ...(mes.colunas || {}), ...local };
-
+    const cols = meses[mesId]?.colunas || {};
     let totalBella = 0, totalDigo = 0, total = 0;
 
     const tds = colunasOrdem.map(nome => {
@@ -130,8 +142,8 @@ function renderTabela() {
       return `<td>
         <div class="cell-data ${pago ? 'pago' : ''}"
              data-mes="${mesId}" data-col="${nome}"
-             title="Clique: Pago/Não pago | Duplo clique: Editar">
-          ${fmtBRL(valor)}<br><small>${tag}</small>
+             title="Clique: editar valor | Segure 1s: marcar Pago">
+          ${valor !== 0 ? fmtBRL(valor) : ''}<br><small>${tag}</small>
         </div>
       </td>`;
     }).join('');
@@ -146,8 +158,34 @@ function renderTabela() {
   }).join('');
 
   tbody.querySelectorAll('.cell-data').forEach(cell => {
-    cell.addEventListener('click', () => toggleStatusLocal(cell.dataset.mes, cell.dataset.col));
-    cell.addEventListener('dblclick', e => { e.stopPropagation(); editarCelulaLocal(cell.dataset.mes, cell.dataset.col); });
+    let pressTimer         = null;
+    let longPressTriggered = false;
+
+    const startPress = () => {
+      longPressTriggered = false;
+      pressTimer = setTimeout(() => {
+        longPressTriggered = true;
+        cell.classList.add('cell-pressing');
+        toggleStatus(cell.dataset.mes, cell.dataset.col);
+      }, 1000);
+    };
+
+    const cancelPress = () => {
+      clearTimeout(pressTimer);
+      cell.classList.remove('cell-pressing');
+    };
+
+    cell.addEventListener('mousedown',  startPress);
+    cell.addEventListener('mouseup',    cancelPress);
+    cell.addEventListener('mouseleave', cancelPress);
+    cell.addEventListener('touchstart', startPress,  { passive: true });
+    cell.addEventListener('touchend',   cancelPress);
+    cell.addEventListener('touchmove',  cancelPress, { passive: true });
+
+    cell.addEventListener('click', () => {
+      if (longPressTriggered) { longPressTriggered = false; return; }
+      editarCelula(cell.dataset.mes, cell.dataset.col);
+    });
   });
 
   const mesAtual = meses[mesAtualId()];
@@ -155,6 +193,8 @@ function renderTabela() {
     const totalAtual = Object.values(mesAtual.colunas || {})
       .reduce((s, c) => s + (parseFloat(c.valor) || 0), 0);
     document.getElementById('mes-atual-metade').textContent = fmtBRL(totalAtual / 2);
+  } else {
+    document.getElementById('mes-atual-metade').textContent = 'R$ —';
   }
 }
 
@@ -209,21 +249,26 @@ function setupColDrag(thead) {
 }
 
 // ────────────────────────────────────────────
-// EDIÇÃO LOCAL (salvar depois)
+// AÇÕES — SALVO IMEDIATAMENTE NO FIRESTORE
 // ────────────────────────────────────────────
-function toggleStatusLocal(mesId, colName) {
-  const mes     = meses[mesId]?.colunas || {};
-  const local   = pendingChanges[mesId] || {};
-  const current = local[colName] || mes[colName] || {};
-  const novo    = (current.status || 'naoPago') === 'Pago' ? 'naoPago' : 'Pago';
-  pendingChanges[mesId] = { ...local, [colName]: { ...current, status: novo } };
-  renderTabela();
+async function toggleStatus(mesId, colName) {
+  const cols  = meses[mesId]?.colunas || {};
+  const atual = cols[colName]?.status || 'naoPago';
+  const novo  = atual === 'Pago' ? 'naoPago' : 'Pago';
+  const cell  = cols[colName] || { valor: 0, pagante: colunasConfig[colName]?.defaultPagante || 'Digo' };
+  try {
+    await setDoc(doc(db, 'contas_casa', mesId), {
+      dataMes: mesIdParaLabel(mesId),
+      colunas: { ...cols, [colName]: { ...cell, status: novo } }
+    }, { merge: true });
+  } catch {
+    showToast('Erro ao atualizar status.', 'error');
+  }
 }
 
-function editarCelulaLocal(mesId, colName) {
-  const mes     = meses[mesId]?.colunas || {};
-  const local   = pendingChanges[mesId] || {};
-  const current = local[colName] || mes[colName] || {};
+function editarCelula(mesId, colName) {
+  const cols    = meses[mesId]?.colunas || {};
+  const current = cols[colName] || {};
   const valor   = current.valor || 0;
   const pagante = current.pagante || colunasConfig[colName]?.defaultPagante || 'Digo';
 
@@ -231,57 +276,44 @@ function editarCelulaLocal(mesId, colName) {
     `Editar — ${colName} (${idToLabel(mesId)})`,
     `<div class="form-group">
        <label>Valor (R$)</label>
-       <input type="number" id="edit-valor-casa" value="${valor}" step="0.01" min="0">
+       <input type="number" id="edit-valor-casa" value="${valor}" step="0.01" min="0" class="form-control">
      </div>
      <div class="form-group">
        <label>Responsável pelo pagamento</label>
-       <select id="edit-pagante-casa">
+       <select id="edit-pagante-casa" class="form-control">
          <option value="Digo"  ${pagante === 'Digo'  ? 'selected' : ''}>Digo</option>
          <option value="Bella" ${pagante === 'Bella' ? 'selected' : ''}>Bella</option>
        </select>
      </div>`,
-    () => {
+    async () => {
       const novoValor   = parseFloat(document.getElementById('edit-valor-casa').value) || 0;
       const novoPagante = document.getElementById('edit-pagante-casa').value;
-      pendingChanges[mesId] = {
-        ...(pendingChanges[mesId] || {}),
-        [colName]: { ...current, valor: novoValor, pagante: novoPagante }
-      };
-      renderTabela();
+      const status      = cols[colName]?.status || 'naoPago';
+      try {
+        await setDoc(doc(db, 'contas_casa', mesId), {
+          dataMes: mesIdParaLabel(mesId),
+          colunas: { ...cols, [colName]: { valor: novoValor, pagante: novoPagante, status } }
+        }, { merge: true });
+        showToast('Valor atualizado!', 'success');
+      } catch {
+        showToast('Erro ao atualizar.', 'error');
+      }
     },
-    'Aplicar'
+    'Salvar'
   );
-}
-
-// ────────────────────────────────────────────
-// SALVAR NO FIRESTORE
-// ────────────────────────────────────────────
-async function salvarAlteracoes() {
-  if (Object.keys(pendingChanges).length === 0) {
-    showToast('Nenhuma alteração pendente.', '');
-    return;
-  }
-  try {
-    for (const [mesId, changes] of Object.entries(pendingChanges)) {
-      const colsAtuais = meses[mesId]?.colunas || {};
-      await setDoc(doc(db, 'contas_casa', mesId), {
-        dataMes: mesIdParaLabel(mesId),
-        colunas: { ...colsAtuais, ...changes }
-      }, { merge: true });
-    }
-    showToast('Dados salvos com sucesso!', 'success');
-    pendingChanges = {};
-  } catch {
-    showToast('Erro ao salvar. Tente novamente.', 'error');
-  }
 }
 
 // ────────────────────────────────────────────
 // GERENCIAR MESES E COLUNAS
 // ────────────────────────────────────────────
-async function adicionarMesAtual() {
-  const mesId = mesAtualId();
-  if (meses[mesId]) { showToast('Mês atual já existe.', ''); return; }
+async function adicionarMes() {
+  const ids    = Object.keys(meses).sort();
+  const ultimo = ids.length > 0 ? ids[ids.length - 1] : mesAtualId();
+  const [y, m] = ultimo.split('-').map(Number);
+  const proximo = new Date(y, m, 1);
+  const mesId  = `${proximo.getFullYear()}-${String(proximo.getMonth() + 1).padStart(2, '0')}`;
+
+  if (meses[mesId]) { showToast(`${idToLabel(mesId)} já existe.`, ''); return; }
 
   const colsPadrao = {};
   colunasOrdem.forEach(nome => {
@@ -290,6 +322,10 @@ async function adicionarMesAtual() {
 
   try {
     await setDoc(doc(db, 'contas_casa', mesId), { dataMes: mesIdParaLabel(mesId), colunas: colsPadrao });
+    if (mesId > filtroFim) {
+      filtroFim = mesId;
+      document.getElementById('casa-filtro-fim').value = filtroFim;
+    }
     showToast(`${idToLabel(mesId)} adicionado!`, 'success');
   } catch {
     showToast('Erro ao adicionar mês.', 'error');
@@ -301,11 +337,11 @@ function adicionarColuna() {
     'Nova Conta da Casa',
     `<div class="form-group">
        <label>Nome da conta</label>
-       <input type="text" id="nova-col-casa" placeholder="Ex: Mercado, Luz, Internet">
+       <input type="text" id="nova-col-casa" placeholder="Ex: Mercado, Luz, Internet" class="form-control">
      </div>
      <div class="form-group">
        <label>Responsável padrão</label>
-       <select id="pagante-padrao-casa">
+       <select id="pagante-padrao-casa" class="form-control">
          <option value="Digo">Digo</option>
          <option value="Bella">Bella</option>
        </select>
