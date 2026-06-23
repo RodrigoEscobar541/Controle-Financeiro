@@ -148,8 +148,8 @@ function renderTabela() {
   }).join('');
 
   tbody.querySelectorAll('.cell-data').forEach(cell => {
-    cell.addEventListener('click', () => toggleStatus(cell.dataset.mes, cell.dataset.col));
-    cell.addEventListener('dblclick', e => { e.stopPropagation(); editarValor(cell.dataset.mes, cell.dataset.col); });
+    cell.addEventListener('click', () => editarValor(cell.dataset.mes, cell.dataset.col));
+    cell.addEventListener('dblclick', e => { e.stopPropagation(); toggleStatus(cell.dataset.mes, cell.dataset.col); });
   });
 }
 
