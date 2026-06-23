@@ -14,3 +14,4 @@ Esse comando diz mais em @Agente_Financeiro_IA.md
 
 Quem ficará ouvindo as mensagens do telegram, será o Railway
 Tudos os arquivo referente ao bot, coloque na pasta @Bot Railway
+Me auxilie se necessario, fazer essa conectividade como o railway
