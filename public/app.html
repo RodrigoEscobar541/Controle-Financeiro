@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Controle Financeiro</title>
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body class="app-body">
+
+  <!-- Sidebar -->
+  <nav class="sidebar">
+    <div class="sidebar-header">
+      <span class="sidebar-logo">💰</span>
+      <span class="sidebar-title">CF</span>
+    </div>
+    <ul class="nav-list">
+      <li>
+        <a href="#" class="nav-link active" data-section="dashboard">
+          <span class="nav-icon">📊</span>
+          <span class="nav-label">Dashboard</span>
+        </a>
+      </li>
+      <li>
+        <a href="#" class="nav-link" data-section="banco">
+          <span class="nav-icon">💳</span>
+          <span class="nav-label">Banco</span>
+        </a>
+      </li>
+      <li>
+        <a href="#" class="nav-link" data-section="distribuicao">
+          <span class="nav-icon">📅</span>
+          <span class="nav-label">Distribuição</span>
+        </a>
+      </li>
+      <li>
+        <a href="#" class="nav-link" data-section="patrimonio">
+          <span class="nav-icon">💎</span>
+          <span class="nav-label">Patrimônio</span>
+        </a>
+      </li>
+      <li>
+        <a href="#" class="nav-link" data-section="contas-casa">
+          <span class="nav-icon">🏠</span>
+          <span class="nav-label">Contas Casa</span>
+        </a>
+      </li>
+    </ul>
+    <div class="sidebar-footer">
+      <span class="user-email-sidebar" id="user-email-sidebar"></span>
+      <button id="logout-btn" class="btn btn-logout">Sair</button>
+    </div>
+  </nav>
+
+  <!-- Main Content -->
+  <main class="main-content">
+
+    <!-- Top Bar -->
+    <div class="top-bar">
+      <h1 class="page-title" id="page-title">Dashboard</h1>
+      <div class="top-bar-right">
+        <span class="current-date" id="current-date"></span>
+      </div>
+    </div>
+
+    <!-- ===== SECTION: DASHBOARD ===== -->
+    <section id="section-dashboard" class="content-section active">
+      <div class="dashboard-grid">
+
+        <div class="card">
+          <div class="card-header">
+            <h3 class="card-title">Últimas 5 Saídas</h3>
+          </div>
+          <table class="data-table" id="dash-saidas">
+            <thead>
+              <tr><th>Data</th><th>Descrição</th><th class="text-right">Valor</th></tr>
+            </thead>
+            <tbody><tr><td colspan="3" class="loading">Carregando...</td></tr></tbody>
+          </table>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <h3 class="card-title">Últimas 5 Entradas</h3>
+          </div>
+          <table class="data-table" id="dash-entradas">
+            <thead>
+              <tr><th>Data</th><th>Descrição</th><th class="text-right">Valor</th></tr>
+            </thead>
+            <tbody><tr><td colspan="3" class="loading">Carregando...</td></tr></tbody>
+          </table>
+        </div>
+
+        <div class="card stat-card">
+          <div class="stat-icon">📅</div>
+          <div class="stat-info">
+            <div class="stat-value" id="dash-orcamento">R$ —</div>
+            <div class="stat-label">Orçamento Mês Atual</div>
+            <div class="stat-sub">Total da Distribuição Mensal</div>
+          </div>
+        </div>
+
+        <div class="card stat-card">
+          <div class="stat-icon">🏠</div>
+          <div class="stat-info">
+            <div class="stat-value" id="dash-contas-casa">R$ —</div>
+            <div class="stat-label">Gastos Casa Mês Atual</div>
+            <div class="stat-sub">Total das Contas da Casa</div>
+          </div>
+        </div>
+
+        <div class="card stat-card">
+          <div class="stat-icon">💎</div>
+          <div class="stat-info">
+            <div class="stat-value" id="dash-investimentos">R$ —</div>
+            <div class="stat-label">Total em Investimentos</div>
+            <div class="stat-sub">Patrimônio acumulado</div>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- ===== SECTION: BANCO ===== -->
+    <section id="section-banco" class="content-section">
+
+      <div class="card">
+        <div class="card-header">
+          <h3 class="card-title">Registrar Lançamento — Mercado Pago</h3>
+        </div>
+        <form id="banco-form" class="form-inline">
+          <div class="radio-group-inline">
+            <label class="radio-label entrada-label">
+              <input type="radio" name="tipo" value="Entrada" checked>
+              <span>Entrada</span>
+            </label>
+            <label class="radio-label saida-label">
+              <input type="radio" name="tipo" value="Saida">
+              <span>Saída</span>
+            </label>
+          </div>
+          <div class="form-group">
+            <input type="text" id="banco-descricao" placeholder="Descrição (ex: Salário)" required>
+          </div>
+          <div class="form-group">
+            <input type="number" id="banco-valor" placeholder="Valor R$" step="0.01" min="0.01" required>
+          </div>
+          <button type="submit" class="btn btn-primary">Registrar</button>
+        </form>
+      </div>
+
+      <div class="tables-2col">
+        <div class="card">
+          <div class="card-header">
+            <h3 class="card-title text-success">Entradas</h3>
+          </div>
+          <table class="data-table" id="banco-entradas">
+            <thead>
+              <tr><th>Data</th><th>Descrição</th><th class="text-right">Valor</th><th></th></tr>
+            </thead>
+            <tbody><tr><td colspan="4" class="loading">Carregando...</td></tr></tbody>
+          </table>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <h3 class="card-title text-danger">Saídas</h3>
+          </div>
+          <table class="data-table" id="banco-saidas">
+            <thead>
+              <tr><th>Data</th><th>Descrição</th><th class="text-right">Valor</th><th></th></tr>
+            </thead>
+            <tbody><tr><td colspan="4" class="loading">Carregando...</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+
+    </section>
+
+    <!-- ===== SECTION: DISTRIBUIÇÃO MENSAL ===== -->
+    <section id="section-distribuicao" class="content-section">
+      <div class="card">
+        <div class="card-header">
+          <h3 class="card-title">Distribuição Mensal do Salário</h3>
+          <div class="card-actions">
+            <button id="btn-add-mes-dist" class="btn btn-secondary">+ Mês Atual</button>
+            <button id="btn-add-col-dist" class="btn btn-primary">+ Nova Coluna</button>
+          </div>
+        </div>
+        <p class="table-hint">Clique numa célula para marcar como <strong>Pago</strong> (verde). Duplo clique para editar o valor.</p>
+        <div class="table-wrapper">
+          <table class="data-table spreadsheet" id="dist-table">
+            <thead id="dist-thead">
+              <tr><th>Mês</th><th>Total</th></tr>
+            </thead>
+            <tbody id="dist-tbody">
+              <tr><td colspan="10" class="loading">Carregando...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== SECTION: PATRIMÔNIO ===== -->
+    <section id="section-patrimonio" class="content-section">
+      <div class="card">
+        <div class="card-header">
+          <h3 class="card-title">Patrimônio e Investimentos</h3>
+          <button id="btn-add-ativo" class="btn btn-primary">+ Novo Ativo</button>
+        </div>
+        <table class="data-table" id="patrimonio-table">
+          <thead>
+            <tr>
+              <th>Ativo</th>
+              <th>Plataforma</th>
+              <th class="text-right">Valor (R$)</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="patrimonio-tbody">
+            <tr><td colspan="4" class="loading">Carregando...</td></tr>
+          </tbody>
+          <tfoot>
+            <tr>
+              <td colspan="2"><strong>Total</strong></td>
+              <td class="text-right"><strong id="patrimonio-total">R$ 0,00</strong></td>
+              <td></td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+    </section>
+
+    <!-- ===== SECTION: CONTAS CASA ===== -->
+    <section id="section-contas-casa" class="content-section">
+      <div class="card">
+        <div class="card-header">
+          <h3 class="card-title">Contas da Casa</h3>
+          <div class="card-actions">
+            <div class="mes-atual-badge">
+              Mês Atual / 2: <strong id="mes-atual-metade">R$ —</strong>
+            </div>
+            <button id="btn-add-mes-casa" class="btn btn-secondary">+ Mês Atual</button>
+            <button id="btn-add-col-casa" class="btn btn-secondary">+ Nova Conta</button>
+            <button id="btn-save-casa" class="btn btn-primary">💾 Salvar</button>
+          </div>
+        </div>
+        <p class="table-hint">Clique numa célula para marcar como <strong>Pago</strong> (verde). Duplo clique para editar valor/pagante.</p>
+        <div class="table-wrapper">
+          <table class="data-table spreadsheet" id="casa-table">
+            <thead id="casa-thead">
+              <tr><th>Data</th><th>Bella</th><th>Digo</th><th>Total</th></tr>
+            </thead>
+            <tbody id="casa-tbody">
+              <tr><td colspan="10" class="loading">Carregando...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- ===== MODAL ===== -->
+  <div id="modal-overlay" class="modal-overlay hidden" role="dialog" aria-modal="true">
+    <div class="modal">
+      <div class="modal-header">
+        <h3 class="modal-title" id="modal-title">Ação</h3>
+        <button class="modal-close" id="modal-close" aria-label="Fechar">×</button>
+      </div>
+      <div class="modal-body" id="modal-body"></div>
+      <div class="modal-footer" id="modal-footer">
+        <button class="btn btn-secondary" id="modal-cancel">Cancelar</button>
+        <button class="btn btn-primary" id="modal-confirm">Confirmar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== TOAST ===== -->
+  <div id="toast" class="toast hidden" role="alert"></div>
+
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>

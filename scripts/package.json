@@ -1,0 +1,11 @@
+{
+  "name": "agente-ia-script",
+  "version": "1.0.0",
+  "description": "Script do Agente IA Financeiro (GitHub Actions)",
+  "main": "agente-ia.js",
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.24.0",
+    "firebase-admin": "^12.0.0",
+    "node-fetch": "^3.3.2"
+  }
+}

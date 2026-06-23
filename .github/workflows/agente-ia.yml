@@ -1,0 +1,33 @@
+name: Agente IA Financeiro
+
+on:
+  repository_dispatch:
+    types: [agente-ia]
+
+jobs:
+  run-agente:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Checkout do repositório
+        uses: actions/checkout@v4
+
+      - name: Instalar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Instalar dependências do agente
+        run: |
+          cd scripts
+          npm install
+
+      - name: Executar Agente IA
+        env:
+          ANTHROPIC_API_KEY:        ${{ secrets.ANTHROPIC_API_KEY }}
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          TELEGRAM_BOT_TOKEN:       ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          MENSAGEM:                 ${{ github.event.client_payload.mensagem }}
+          CHAT_ID:                  ${{ github.event.client_payload.chat_id }}
+        run: node scripts/agente-ia.js

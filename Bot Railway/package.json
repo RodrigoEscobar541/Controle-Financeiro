@@ -1,0 +1,18 @@
+{
+  "name": "controle-financeiro-bot",
+  "version": "1.0.0",
+  "description": "Bot Telegram para Controle Financeiro",
+  "main": "index.js",
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "telegraf": "^4.16.3",
+    "firebase-admin": "^12.0.0",
+    "axios": "^1.6.0",
+    "dotenv": "^16.4.0"
+  }
+}
