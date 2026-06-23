@@ -183,9 +183,14 @@
         <div class="card-header">
           <h3 class="card-title">Distribuição Mensal do Salário</h3>
           <div class="card-actions">
-            <button id="btn-add-mes-dist" class="btn btn-secondary">+ Mês Atual</button>
+            <button id="btn-add-mes-dist" class="btn btn-secondary">+ Mês</button>
             <button id="btn-add-col-dist" class="btn btn-primary">+ Nova Coluna</button>
           </div>
+        </div>
+        <div class="filter-bar">
+          <span class="filter-label">Período:</span>
+          <label class="filter-group">De <input type="month" id="dist-filtro-inicio"></label>
+          <label class="filter-group">Até <input type="month" id="dist-filtro-fim"></label>
         </div>
         <p class="table-hint">Clique numa célula para marcar como <strong>Pago</strong> (verde). Duplo clique para editar o valor.</p>
         <div class="table-wrapper">

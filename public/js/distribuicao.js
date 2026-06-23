@@ -12,9 +12,9 @@
  */
 
 import { db } from './firebase-config.js';
-import { fmtBRL, mesAtualId, mesAtualLabel, idToLabel, showToast, openModal } from './app.js';
+import { fmtBRL, mesAtualId, idToLabel, showToast, openModal } from './app.js';
 import {
-  collection, doc, getDoc, setDoc, updateDoc, deleteField, onSnapshot
+  collection, doc, setDoc, updateDoc, deleteField, onSnapshot
 } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
 
 let colunas  = [];
@@ -22,10 +22,46 @@ let meses    = {};  // { "2026-06": { dataMes, colunas: { nome: {valor, status} 
 let unsubMeses = null;
 let unsubConf  = null;
 
+let filtroInicio = '';
+let filtroFim    = '';
+
 export function initDistribuicao() {
+  calcDefaultFiltro();
+
+  const inputInicio = document.getElementById('dist-filtro-inicio');
+  const inputFim    = document.getElementById('dist-filtro-fim');
+
+  inputInicio.value = filtroInicio;
+  inputFim.value    = filtroFim;
+
+  inputInicio.addEventListener('change', () => {
+    filtroInicio = inputInicio.value;
+    renderTabela();
+  });
+  inputFim.addEventListener('change', () => {
+    filtroFim = inputFim.value;
+    renderTabela();
+  });
+
   document.getElementById('btn-add-col-dist').addEventListener('click', adicionarColuna);
-  document.getElementById('btn-add-mes-dist').addEventListener('click', adicionarMesAtual);
+  document.getElementById('btn-add-mes-dist').addEventListener('click', adicionarMes);
+
   subscribeConfig();
+}
+
+// ────────────────────────────────────────────
+// FILTRO DE PERÍODO
+// ────────────────────────────────────────────
+function calcDefaultFiltro() {
+  const now = new Date();
+
+  // 5 meses atrás
+  const inicio = new Date(now.getFullYear(), now.getMonth() - 5, 1);
+  filtroInicio = `${inicio.getFullYear()}-${String(inicio.getMonth() + 1).padStart(2, '0')}`;
+
+  // 12 meses à frente
+  const fim = new Date(now.getFullYear(), now.getMonth() + 12, 1);
+  filtroFim = `${fim.getFullYear()}-${String(fim.getMonth() + 1).padStart(2, '0')}`;
 }
 
 // ────────────────────────────────────────────
@@ -64,18 +100,22 @@ function renderTabela() {
   `).join('');
   thead.innerHTML = `<tr><th>Mês</th>${thCols}<th class="col-total">Total</th></tr>`;
 
-  // Eventos de deleção de coluna
   thead.querySelectorAll('.delete-col-btn').forEach(btn => {
     btn.addEventListener('click', () => removerColuna(btn.dataset.col));
   });
 
-  // Body
-  const sortedIds = Object.keys(meses).sort().reverse();
+  // Filtra e ordena os meses pelo período selecionado
+  const sortedIds = Object.keys(meses)
+    .filter(id => (!filtroInicio || id >= filtroInicio) && (!filtroFim || id <= filtroFim))
+    .sort()
+    .reverse();
 
   if (sortedIds.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="${colunas.length + 2}" class="empty-state">
-      Nenhum mês cadastrado. Clique em "+ Mês Atual" para começar.
-    </td></tr>`;
+    const todosIds = Object.keys(meses);
+    const msg = todosIds.length === 0
+      ? 'Nenhum mês cadastrado. Clique em "+ Mês" para começar.'
+      : 'Nenhum mês no período selecionado. Ajuste o filtro ou adicione um mês.';
+    tbody.innerHTML = `<tr><td colspan="${colunas.length + 2}" class="empty-state">${msg}</td></tr>`;
     return;
   }
 
@@ -107,7 +147,6 @@ function renderTabela() {
     </tr>`;
   }).join('');
 
-  // Click: toggle status | Dblclick: editar valor
   tbody.querySelectorAll('.cell-data').forEach(cell => {
     cell.addEventListener('click', () => toggleStatus(cell.dataset.mes, cell.dataset.col));
     cell.addEventListener('dblclick', e => { e.stopPropagation(); editarValor(cell.dataset.mes, cell.dataset.col); });
@@ -161,22 +200,43 @@ function editarValor(mesId, colName) {
   );
 }
 
-async function adicionarMesAtual() {
-  const mesId = mesAtualId();
-  if (meses[mesId]) { showToast('Mês atual já existe na tabela.', ''); return; }
+function adicionarMes() {
+  openModal(
+    'Adicionar Mês',
+    `<div class="form-group">
+       <label>Mês</label>
+       <input type="month" id="add-mes-input" value="${mesAtualId()}" class="form-control">
+     </div>`,
+    async () => {
+      const mesId = document.getElementById('add-mes-input').value;
+      if (!mesId) { showToast('Selecione um mês.', 'error'); return; }
+      if (meses[mesId]) { showToast('Este mês já existe na tabela.', ''); return; }
 
-  const colunasPadrao = {};
-  colunas.forEach(c => { colunasPadrao[c] = { valor: 0, status: 'naoPago' }; });
+      const colunasPadrao = {};
+      colunas.forEach(c => { colunasPadrao[c] = { valor: 0, status: 'naoPago' }; });
 
-  try {
-    await setDoc(doc(db, 'distribuicao_mensal', mesId), {
-      dataMes: mesIdToLabel(mesId),
-      colunas: colunasPadrao
-    });
-    showToast(`${idToLabel(mesId)} adicionado!`, 'success');
-  } catch {
-    showToast('Erro ao adicionar mês.', 'error');
-  }
+      try {
+        await setDoc(doc(db, 'distribuicao_mensal', mesId), {
+          dataMes: mesIdToLabel(mesId),
+          colunas: colunasPadrao
+        });
+
+        // Expande o filtro automaticamente se o mês estiver fora do período
+        let changed = false;
+        if (mesId < filtroInicio) { filtroInicio = mesId; changed = true; }
+        if (mesId > filtroFim)    { filtroFim    = mesId; changed = true; }
+        if (changed) {
+          document.getElementById('dist-filtro-inicio').value = filtroInicio;
+          document.getElementById('dist-filtro-fim').value    = filtroFim;
+        }
+
+        showToast(`${idToLabel(mesId)} adicionado!`, 'success');
+      } catch {
+        showToast('Erro ao adicionar mês.', 'error');
+      }
+    },
+    'Adicionar'
+  );
 }
 
 function adicionarColuna() {
@@ -194,7 +254,6 @@ function adicionarColuna() {
       const novasColunas = [...colunas, nome];
       try {
         await setDoc(doc(db, 'config', 'distribuicao_colunas'), { colunas: novasColunas });
-        // Adiciona a nova coluna em todos os meses existentes
         for (const mesId of Object.keys(meses)) {
           const cols = meses[mesId]?.colunas || {};
           if (!cols[nome]) {
