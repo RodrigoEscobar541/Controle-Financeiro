@@ -129,8 +129,38 @@ function renderTabela() {
   }).join('');
 
   tbody.querySelectorAll('.cell-data').forEach(cell => {
-    cell.addEventListener('click', () => editarValor(cell.dataset.mes, cell.dataset.col));
-    cell.addEventListener('dblclick', e => { e.stopPropagation(); toggleStatus(cell.dataset.mes, cell.dataset.col); });
+    let pressTimer        = null;
+    let longPressTriggered = false;
+
+    const startPress = () => {
+      longPressTriggered = false;
+      pressTimer = setTimeout(() => {
+        longPressTriggered = true;
+        cell.classList.add('cell-pressing');
+        toggleStatus(cell.dataset.mes, cell.dataset.col);
+      }, 1000);
+    };
+
+    const cancelPress = () => {
+      clearTimeout(pressTimer);
+      cell.classList.remove('cell-pressing');
+    };
+
+    // Mouse
+    cell.addEventListener('mousedown', startPress);
+    cell.addEventListener('mouseup',   cancelPress);
+    cell.addEventListener('mouseleave', cancelPress);
+
+    // Touch (mobile)
+    cell.addEventListener('touchstart', startPress, { passive: true });
+    cell.addEventListener('touchend',   cancelPress);
+    cell.addEventListener('touchmove',  cancelPress, { passive: true });
+
+    // Click só abre o modal se não foi long press
+    cell.addEventListener('click', () => {
+      if (longPressTriggered) { longPressTriggered = false; return; }
+      editarValor(cell.dataset.mes, cell.dataset.col);
+    });
   });
 }
 

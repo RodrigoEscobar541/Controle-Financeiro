@@ -778,6 +778,18 @@ th[draggable]:active { cursor: grabbing; }
   outline-offset: -2px;
 }
 
+/* Feedback visual durante o long press (1s para marcar Pago) */
+.cell-pressing {
+  outline: 2px solid var(--success);
+  outline-offset: -2px;
+  animation: press-fill 1s linear forwards;
+}
+
+@keyframes press-fill {
+  from { background-color: transparent; }
+  to   { background-color: var(--success-light); }
+}
+
 /* Pagante tag */
 .pagante-tag {
   display: inline-block;
