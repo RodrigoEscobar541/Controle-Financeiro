@@ -1,4 +1,3 @@
-import './auth.js';
 import { initDashboard }   from './dashboard.js';
 import { initBanco }       from './banco.js';
 import { initDistribuicao} from './distribuicao.js';
