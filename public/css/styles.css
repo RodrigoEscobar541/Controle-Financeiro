@@ -758,6 +758,26 @@ input, select, textarea { font-family: inherit; font-size: inherit; }
    ============================================================ */
 .hidden { display: none !important; }
 
+/* Drag & drop de colunas */
+th[draggable] {
+  cursor: grab;
+  user-select: none;
+  transition: background 0.15s, opacity 0.15s;
+}
+
+th[draggable]:active { cursor: grabbing; }
+
+.col-dragging {
+  opacity: 0.35;
+  background: var(--primary-light) !important;
+}
+
+.col-drag-over {
+  background: var(--primary-light) !important;
+  outline: 2px dashed var(--primary);
+  outline-offset: -2px;
+}
+
 /* Pagante tag */
 .pagante-tag {
   display: inline-block;
