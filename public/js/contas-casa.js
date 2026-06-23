@@ -30,14 +30,11 @@ export function initContasCasa() {
 
   const inputInicio = document.getElementById('casa-filtro-inicio');
   const inputFim    = document.getElementById('casa-filtro-fim');
-  inputInicio.value = filtroInicio;
-  inputFim.value    = filtroFim;
+  if (inputInicio) { inputInicio.value = filtroInicio; inputInicio.addEventListener('change', () => { filtroInicio = inputInicio.value; renderTabela(); }); }
+  if (inputFim)    { inputFim.value    = filtroFim;    inputFim.addEventListener('change',    () => { filtroFim    = inputFim.value;    renderTabela(); }); }
 
-  inputInicio.addEventListener('change', () => { filtroInicio = inputInicio.value; renderTabela(); });
-  inputFim.addEventListener('change',    () => { filtroFim    = inputFim.value;    renderTabela(); });
-
-  document.getElementById('btn-add-mes-casa').addEventListener('click', adicionarMes);
-  document.getElementById('btn-add-col-casa').addEventListener('click', adicionarColuna);
+  document.getElementById('btn-add-mes-casa')?.addEventListener('click', adicionarMes);
+  document.getElementById('btn-add-col-casa')?.addEventListener('click', adicionarColuna);
 
   subscribeConfig();
 }
