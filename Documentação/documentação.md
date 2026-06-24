@@ -12,8 +12,8 @@ Sistema web de controle financeiro pessoal com interface tipo planilha, autentic
 GitHub (código) → GitHub Actions → Firebase Hosting (front-end)
                                  → Firestore (banco de dados)
 
-Telegram Bot (Railway) → Firestore (leitura/escrita direta)
-                       → GitHub Actions (via repository_dispatch) → Agente IA (Claude API)
+Telegram Bot (Render) → Firestore (leitura/escrita direta)
+                      → GitHub Actions (via repository_dispatch) → Agente IA (Claude API)
 ```
 
 ---
@@ -36,13 +36,13 @@ Controle-Financeiro/
 │       ├── patrimonio.js          ← Section Patrimônio
 │       └── contas-casa.js         ← Section Contas da Casa
 │
-├── Querys/                        ← Queries Firestore (usadas pelo bot Railway)
+├── Querys/                        ← Queries Firestore (usadas pelo bot Render)
 │   ├── banco-queries.js
 │   ├── patrimonio-queries.js
 │   ├── distribuicao-queries.js
 │   └── contas-casa-queries.js
 │
-├── Bot Railway/                   ← Bot Telegram (hospedado no Railway)
+├── Bot Render/                    ← Bot Telegram (hospedado no Render)
 │   ├── index.js                   ← Entrada do bot
 │   ├── package.json
 │   ├── .env.example               ← ⚠️ Copie para .env e preencha
@@ -163,16 +163,17 @@ Acesse: **GitHub → Repositório → Settings → Secrets → Actions**
 1. Fale com [@BotFather](https://t.me/BotFather) no Telegram
 2. Envie `/newbot` e siga as instruções
 3. Copie o **Token** recebido
-4. Na pasta `Bot Railway/`, copie `.env.example` para `.env` e preencha
+4. Na pasta `Bot Render/`, copie `.env.example` para `.env` e preencha
 5. Descubra seu `TELEGRAM_CHAT_ID_AUTORIZADO`: inicie o bot e envie `/start` — o ID aparece no log
 
-### 4. Railway (Bot)
+### 4. Render (Bot)
 
-1. Acesse [railway.app](https://railway.app)
-2. Crie um novo projeto → "Deploy from GitHub Repo"
-3. Selecione este repositório e a pasta `Bot Railway`
-4. Adicione as variáveis de ambiente (mesmo que o `.env`)
-5. O Railway detectará `package.json` e iniciará com `npm start`
+1. Acesse [render.com](https://render.com)
+2. Crie um novo **Web Service** → "Connect a repository"
+3. Selecione este repositório e defina o **Root Directory** como `Bot Render`
+4. **Build Command:** `npm install` | **Start Command:** `node index.js`
+5. Adicione as variáveis de ambiente nas configurações do serviço
+6. O Render iniciará automaticamente com `npm start`
 
 ### 5. Deploy Automático
 
@@ -213,7 +214,7 @@ O sistema foi projetado para usar `onSnapshot` com eficiência e `limit()` nas q
 
 ```
 Usuário → Telegram (/agente pergunta)
-  → Bot (Railway) → GitHub Actions (repository_dispatch)
+  → Bot (Render) → GitHub Actions (repository_dispatch)
     → agente-ia.js (GitHub Actions)
       → Coleta dados do Firestore
       → Chama API Claude (claude-sonnet-4-6)

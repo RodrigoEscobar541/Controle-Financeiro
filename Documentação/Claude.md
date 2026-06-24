@@ -10,7 +10,7 @@
 
 - **Sempre fazer `git pull` antes de qualquer alteração**
 - **Sempre fazer push no GitHub** (não no Firebase diretamente — o GitHub Actions faz o deploy automático)
-- **Queries ao Firestore devem ficar na pasta `Querys/`** (para o bot Railway)
+- **Queries ao Firestore devem ficar na pasta `Querys/`** (para o bot Render)
 - **Sempre que alterar código que o Agente usa, atualizar `Agente_Financeiro_IA.md`** para garantir que o agente não quebre
 
 ---
@@ -22,7 +22,7 @@ Veja `documentação.md` na raiz do projeto para a documentação completa.
 **Resumo dos arquivos:**
 - `public/` → App web (Firebase Hosting)
 - `Querys/` → Queries Firestore para o bot
-- `Bot Railway/` → Bot Telegram (hospedado no Railway)
+- `Bot Render/` → Bot Telegram (hospedado no Render)
 - `scripts/agente-ia.js` → Agente IA (roda no GitHub Actions)
 - `.github/workflows/` → CI/CD automático
 
@@ -37,9 +37,9 @@ Para configurar o sistema do zero, você precisará de:
 | Firebase Config (apiKey, projectId, etc.) | Console Firebase → Configurações → Seus Apps | `public/js/firebase-config.js` |
 | Firebase Project ID | Console Firebase | `.firebaserc` |
 | Firebase Service Account (JSON) | Console Firebase → Contas de Serviço | GitHub Secret: `FIREBASE_SERVICE_ACCOUNT` |
-| Telegram Bot Token | @BotFather no Telegram → /newbot | GitHub Secret `TELEGRAM_BOT_TOKEN` + `Bot Railway/.env` |
+| Telegram Bot Token | @BotFather no Telegram → /newbot | GitHub Secret `TELEGRAM_BOT_TOKEN` + `Bot Render/.env` |
 | Anthropic API Key | console.anthropic.com | GitHub Secret: `ANTHROPIC_API_KEY` |
-| GitHub Personal Access Token | GitHub → Settings → Developer settings → PAT | `Bot Railway/.env` como `GITHUB_TOKEN` |
+| GitHub Personal Access Token | GitHub → Settings → Developer settings → PAT | `Bot Render/.env` como `GITHUB_TOKEN` |
 
 ---
 
