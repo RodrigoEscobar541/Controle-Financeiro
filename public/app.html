@@ -49,7 +49,13 @@
       <li>
         <a href="#" class="nav-link" data-section="carro">
           <span class="nav-icon">🚗</span>
-          <span class="nav-label">Carro</span>
+          <span class="nav-label">Focus</span>
+        </a>
+      </li>
+      <li>
+        <a href="#" class="nav-link" data-section="face">
+          <span class="nav-icon">🚙</span>
+          <span class="nav-label">Face</span>
         </a>
       </li>
       <li>
@@ -443,6 +449,94 @@
           <span class="notas-status" id="notas-status-carro"></span>
         </div>
         <textarea class="notas-textarea" id="notas-carro" placeholder="Deixe recados sobre o carro…"></textarea>
+      </div>
+    </section>
+
+    <!-- ===== SECTION: FOCUS ===== -->
+    <section id="section-face" class="content-section">
+
+      <!-- A FAZER -->
+      <div class="card">
+        <div class="card-header">
+          <h3 class="card-title">🔧 A Fazer</h3>
+          <button id="btn-add-afazer-focus" class="btn btn-primary">+ Novo Item</button>
+        </div>
+        <table class="data-table" id="focus-afazer-table">
+          <thead>
+            <tr>
+              <th style="width:80px;text-align:center">Prioridade</th>
+              <th>Descrição</th>
+              <th class="text-right">Valor estimado</th>
+              <th style="width:90px"></th>
+            </tr>
+          </thead>
+          <tbody><tr><td colspan="4" class="loading">Carregando...</td></tr></tbody>
+          <tfoot>
+            <tr>
+              <td colspan="2"><strong>Total estimado</strong></td>
+              <td class="text-right"><strong id="focus-afazer-total">R$ 0,00</strong></td>
+              <td></td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+
+      <!-- FEITOS -->
+      <div class="card">
+        <div class="card-header">
+          <h3 class="card-title">✅ Feitos</h3>
+          <button id="btn-add-feito-focus" class="btn btn-primary">+ Registrar</button>
+        </div>
+        <table class="data-table" id="focus-feitos-table">
+          <thead>
+            <tr>
+              <th>Data</th>
+              <th>Descrição</th>
+              <th class="text-right">Valor</th>
+              <th style="width:60px"></th>
+            </tr>
+          </thead>
+          <tbody><tr><td colspan="4" class="loading">Carregando...</td></tr></tbody>
+          <tfoot>
+            <tr>
+              <td colspan="2"><strong>Total gasto</strong></td>
+              <td class="text-right"><strong id="focus-feitos-total">R$ 0,00</strong></td>
+              <td></td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+
+      <!-- MANUTENÇÃO PREVENTIVA -->
+      <div class="card">
+        <div class="card-header">
+          <h3 class="card-title">📅 Manutenção Preventiva</h3>
+          <button id="btn-add-manutencao-focus" class="btn btn-primary">+ Adicionar</button>
+        </div>
+        <div class="table-wrapper">
+          <table class="data-table" id="focus-manutencao-table">
+            <thead>
+              <tr>
+                <th>Descrição</th>
+                <th>Última troca</th>
+                <th>KM última</th>
+                <th>KM próxima</th>
+                <th class="text-right">Valor Estimado</th>
+                <th style="width:90px"></th>
+              </tr>
+            </thead>
+            <tbody><tr><td colspan="6" class="loading">Carregando...</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="notas-card">
+        <div class="notas-header">
+          <span class="notas-icon">📝</span>
+          <span class="notas-title">Anotações</span>
+          <span class="notas-status" id="notas-status-face"></span>
+        </div>
+        <textarea class="notas-textarea" id="notas-face" placeholder="Deixe recados sobre o Focus…"></textarea>
       </div>
     </section>
 

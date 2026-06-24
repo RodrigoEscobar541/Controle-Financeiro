@@ -4,6 +4,7 @@ import { initDistribuicao} from './distribuicao.js';
 import { initPatrimonio }  from './patrimonio.js';
 import { initContasCasa }  from './contas-casa.js';
 import { initCarro }       from './carro.js';
+import { initFocus }       from './focus.js';
 import { initDevoDeve }    from './devo-devem.js';
 import { auth, onAuthStateChanged } from './auth.js';
 import { initNotas }       from './notas.js';
@@ -84,7 +85,8 @@ const SECTION_TITLES = {
   distribuicao: 'Distribuição Mensal do Salário',
   patrimonio:   'Patrimônio e Investimentos',
   'contas-casa':'Contas da Casa',
-  carro:        'Carro',
+  carro:        'Focus',
+  face:         'Face',
   'devo-devem': 'Devo e Devem'
 };
 
@@ -115,6 +117,7 @@ function activateSection(name) {
     if (name === 'patrimonio')   initPatrimonio();
     if (name === 'contas-casa')  initContasCasa();
     if (name === 'carro')        initCarro();
+    if (name === 'face')         initFocus();
     if (name === 'devo-devem')   initDevoDeve();
     initNotas(name);
   }
