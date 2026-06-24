@@ -2,11 +2,12 @@ import { db } from './firebase-config.js';
 import { fmtBRL, fmtDate, showToast, openModal } from './app.js';
 import {
   collection, query, orderBy, where, onSnapshot,
-  addDoc, deleteDoc, doc
+  doc, writeBatch, increment
 } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
 
-let unsubscribe  = null;
+let unsubscribe    = null;
 let mostrarAntigos = false;
+let transacoes     = []; // cache para operações de exclusão sem re-leitura
 
 export function initBanco() {
   renderForm();
@@ -17,6 +18,10 @@ function corteUmAno() {
   const d = new Date();
   d.setFullYear(d.getFullYear() - 1);
   return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+
+function metaRef() {
+  return doc(db, 'banco_meta', 'saldo');
 }
 
 function renderForm() {
@@ -36,7 +41,17 @@ function renderForm() {
     const data = `${hoje.getFullYear()}-${String(hoje.getMonth()+1).padStart(2,'0')}-${String(hoje.getDate()).padStart(2,'0')}`;
 
     try {
-      await addDoc(collection(db, 'banco'), { data, tipo, valor, descricao });
+      const batch    = writeBatch(db);
+      const transRef = doc(collection(db, 'banco'));
+      batch.set(transRef, { data, tipo, valor, descricao });
+
+      if (tipo === 'Entrada') {
+        batch.set(metaRef(), { entradas: increment(valor), saldo: increment(valor)  }, { merge: true });
+      } else {
+        batch.set(metaRef(), { saidas:   increment(valor), saldo: increment(-valor) }, { merge: true });
+      }
+
+      await batch.commit();
       showToast(`${tipo} registrada com sucesso!`, 'success');
       form.reset();
     } catch {
@@ -54,9 +69,9 @@ function subscribeTransacoes() {
 
   const q = query(collection(db, 'banco'), ...constraints);
   unsubscribe = onSnapshot(q, snap => {
-    const docs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-    renderTabela(docs.filter(r => r.tipo === 'Entrada'), 'banco-entradas', 'success');
-    renderTabela(docs.filter(r => r.tipo === 'Saida'),   'banco-saidas',   'danger');
+    transacoes = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    renderTabela(transacoes.filter(r => r.tipo === 'Entrada'), 'banco-entradas', 'success');
+    renderTabela(transacoes.filter(r => r.tipo === 'Saida'),   'banco-saidas',   'danger');
   }, () => {
     showToast('Erro ao escutar transações.', 'error');
   });
@@ -98,12 +113,25 @@ function renderTabela(docs, tableId, colorClass) {
 }
 
 function confirmarExclusao(id) {
+  const transacao = transacoes.find(t => t.id === id);
+  if (!transacao) return;
+
   openModal(
     'Excluir lançamento',
     '<p>Tem certeza que deseja excluir este lançamento? Esta ação não pode ser desfeita.</p>',
     async () => {
       try {
-        await deleteDoc(doc(db, 'banco', id));
+        const delta = parseFloat(transacao.valor) || 0;
+        const batch = writeBatch(db);
+        batch.delete(doc(db, 'banco', id));
+
+        if (transacao.tipo === 'Entrada') {
+          batch.set(metaRef(), { entradas: increment(-delta), saldo: increment(-delta) }, { merge: true });
+        } else {
+          batch.set(metaRef(), { saidas:   increment(-delta), saldo: increment(delta)  }, { merge: true });
+        }
+
+        await batch.commit();
         showToast('Lançamento excluído.', 'success');
       } catch {
         showToast('Erro ao excluir.', 'error');
