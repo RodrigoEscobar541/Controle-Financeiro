@@ -54,6 +54,10 @@ bot.on('text', ctx => ctx.reply(
   'Comando não reconhecido. Use /help para ver os comandos disponíveis.'
 ));
 
+// ─── Health check para o Render ──────────────────────────────
+const http = require('http');
+http.createServer((req, res) => res.end('Bot está vivo!')).listen(process.env.PORT || 3000);
+
 // ─── Start ───────────────────────────────────────────────────
 bot.launch()
   .then(() => console.log('✅ Bot iniciado com sucesso!'))
