@@ -190,6 +190,7 @@ function renderTabela(listaFiltrada, listaCompleta, tbodyId, totalId) {
         </span>
       </td>
       <td style="text-align:center">
+        <button class="btn-icon" data-action="edit" data-id="${item.id}" title="Editar">✏️</button>
         <button class="btn-icon" data-action="delete" data-id="${item.id}" title="Excluir">🗑️</button>
       </td>
     </tr>`;
@@ -197,6 +198,12 @@ function renderTabela(listaFiltrada, listaCompleta, tbodyId, totalId) {
 
   tbody.querySelectorAll('.status-badge').forEach(badge => {
     badge.addEventListener('click', () => toggleStatus(badge.dataset.id, badge.dataset.status));
+  });
+  tbody.querySelectorAll('[data-action="edit"]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const item = dividas.find(d => d.id === btn.dataset.id);
+      if (item) abrirModalEditar(item);
+    });
   });
   tbody.querySelectorAll('[data-action="delete"]').forEach(btn => {
     btn.addEventListener('click', () => confirmarExclusao(btn.dataset.id));
@@ -210,6 +217,49 @@ async function toggleStatus(id, statusAtual) {
   } catch {
     showToast('Erro ao atualizar status.', 'error');
   }
+}
+
+function abrirModalEditar(divida) {
+  const dataInput = yyyymmToMmAaaa(divida.data);
+
+  openModal(
+    'Editar parcela',
+    `<div class="form-group">
+       <label>Descrição</label>
+       <input type="text" id="dd-edit-descricao" value="${esc(divida.descricao)}" required>
+     </div>
+     <div class="form-group">
+       <label>Valor (R$)</label>
+       <input type="number" id="dd-edit-valor" value="${divida.valor}" min="0.01" step="0.01" required>
+     </div>
+     <div class="form-group">
+       <label>Mês (MM-AAAA)</label>
+       <input type="text" id="dd-edit-data" value="${dataInput}" placeholder="06-2026" maxlength="7">
+     </div>`,
+    async () => {
+      const descricao = document.getElementById('dd-edit-descricao').value.trim();
+      const valor     = parseFloat(document.getElementById('dd-edit-valor').value);
+      const dataStr   = document.getElementById('dd-edit-data').value.trim();
+
+      if (!descricao || isNaN(valor) || valor <= 0) {
+        showToast('Preencha descrição e valor.', 'error'); return;
+      }
+      if (!validarMesAno(dataStr)) {
+        showToast('Data inválida. Use MM-AAAA (ex: 06-2026).', 'error'); return;
+      }
+
+      const [mes, ano] = dataStr.split('-');
+      const data = `${ano}-${mes.padStart(2, '0')}`;
+
+      try {
+        await updateDoc(doc(db, 'dividas', divida.id), { descricao, valor, data });
+        showToast('Parcela atualizada!', 'success');
+      } catch {
+        showToast('Erro ao atualizar.', 'error');
+      }
+    },
+    'Salvar'
+  );
 }
 
 function confirmarExclusao(id) {
@@ -239,6 +289,12 @@ function fmtMesAno(data) {
   if (!data) return '—';
   const [y, m] = data.split('-');
   return `${m}/${y}`;
+}
+
+function yyyymmToMmAaaa(str) {
+  if (!str) return '';
+  const [y, m] = str.split('-');
+  return `${m}-${y}`;
 }
 
 function esc(str) {

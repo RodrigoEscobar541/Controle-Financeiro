@@ -1,0 +1,65 @@
+/**
+ * Querys — Coleções: carro_afazer, carro_feitos, carro_manutencao
+ * Usadas pelo Bot Render (firebase-admin SDK)
+ *
+ * carro_afazer    { prioridade: Number, descricao: String, valor: Number }
+ * carro_feitos    { data: "YYYY-MM-DD", descricao: String, valor: Number }
+ * carro_manutencao { descricao: String, data: "YYYY-MM-DD", kmUltimaTroca: String, kmProximaTroca: String, valor: Number }
+ */
+
+async function getAfazer(db) {
+  const snap = await db.collection('carro_afazer').orderBy('prioridade', 'asc').get();
+  return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+}
+
+async function adicionarAfazer(db, { prioridade, descricao, valor }) {
+  return db.collection('carro_afazer').add({ prioridade, descricao, valor });
+}
+
+async function atualizarAfazer(db, id, { prioridade, descricao, valor }) {
+  return db.collection('carro_afazer').doc(id).update({ prioridade, descricao, valor });
+}
+
+async function excluirAfazer(db, id) {
+  return db.collection('carro_afazer').doc(id).delete();
+}
+
+async function getFeitos(db, limite = 50) {
+  const snap = await db.collection('carro_feitos').orderBy('data', 'desc').limit(limite).get();
+  return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+}
+
+async function adicionarFeito(db, { data, descricao, valor }) {
+  return db.collection('carro_feitos').add({ data, descricao, valor });
+}
+
+async function atualizarFeito(db, id, { data, descricao, valor }) {
+  return db.collection('carro_feitos').doc(id).update({ data, descricao, valor });
+}
+
+async function excluirFeito(db, id) {
+  return db.collection('carro_feitos').doc(id).delete();
+}
+
+async function getManutencao(db) {
+  const snap = await db.collection('carro_manutencao').get();
+  return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+}
+
+async function adicionarManutencao(db, { descricao, data, kmUltimaTroca, kmProximaTroca, valor }) {
+  return db.collection('carro_manutencao').add({ descricao, data, kmUltimaTroca, kmProximaTroca, valor });
+}
+
+async function atualizarManutencao(db, id, { descricao, data, kmUltimaTroca, kmProximaTroca, valor }) {
+  return db.collection('carro_manutencao').doc(id).update({ descricao, data, kmUltimaTroca, kmProximaTroca, valor });
+}
+
+async function excluirManutencao(db, id) {
+  return db.collection('carro_manutencao').doc(id).delete();
+}
+
+module.exports = {
+  getAfazer, adicionarAfazer, atualizarAfazer, excluirAfazer,
+  getFeitos, adicionarFeito, atualizarFeito, excluirFeito,
+  getManutencao, adicionarManutencao, atualizarManutencao, excluirManutencao,
+};
