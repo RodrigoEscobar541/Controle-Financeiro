@@ -14,14 +14,15 @@ import {
   addDoc, deleteDoc, updateDoc, doc
 } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
 
-let afazer     = [];
-let feitos     = [];
-let manutencao = [];
-let unsubs     = [];
+let afazer        = [];
+let feitos        = [];
+let manutencao    = [];
+let unsubs        = [];
+let feitosVisiveis = 5;
 
 export function initCarro() {
   document.getElementById('btn-add-afazer').addEventListener('click',     () => abrirModalAfazer());
-  document.getElementById('btn-add-feito').addEventListener('click',      abrirModalFeito);
+  document.getElementById('btn-add-feito').addEventListener('click',      () => abrirModalFeito());
   document.getElementById('btn-add-manutencao').addEventListener('click', () => abrirModalManutencao());
   subscribeAll();
 }
@@ -139,40 +140,63 @@ function renderFeitos() {
   }
 
   let total = 0;
-  tbody.innerHTML = feitos.map(item => {
-    total += parseFloat(item.valor) || 0;
-    return `<tr>
+  feitos.forEach(item => { total += parseFloat(item.valor) || 0; });
+
+  const visiveis = feitos.slice(0, feitosVisiveis);
+
+  tbody.innerHTML = visiveis.map(item => `<tr>
       <td>${fmtDate(item.data)}</td>
       <td>${esc(item.descricao)}</td>
       <td class="text-right text-success">${fmtBRL(item.valor)}</td>
-      <td style="text-align:center">
+      <td style="text-align:center;white-space:nowrap">
+        <button class="btn-icon" data-action="edit"   data-id="${item.id}" title="Editar">✏️</button>
         <button class="btn-icon" data-action="delete" data-id="${item.id}" title="Excluir">🗑️</button>
       </td>
+    </tr>`).join('');
+
+  if (feitos.length > feitosVisiveis) {
+    const restantes = feitos.length - feitosVisiveis;
+    tbody.innerHTML += `<tr>
+      <td colspan="4" style="text-align:center;padding:.6rem 0">
+        <button id="btn-feitos-mais" class="btn-secondary">Carregar mais (${restantes})</button>
+      </td>
     </tr>`;
-  }).join('');
+  }
 
   totalEl.textContent = fmtBRL(total);
 
+  tbody.querySelectorAll('[data-action="edit"]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const item = feitos.find(f => f.id === btn.dataset.id);
+      if (item) abrirModalFeito(item);
+    });
+  });
   tbody.querySelectorAll('[data-action="delete"]').forEach(btn => {
     btn.addEventListener('click', () => excluirItem('carro_feitos', btn.dataset.id, feitos));
   });
+
+  const btnMais = document.getElementById('btn-feitos-mais');
+  if (btnMais) {
+    btnMais.addEventListener('click', () => { feitosVisiveis += 5; renderFeitos(); });
+  }
 }
 
-function abrirModalFeito() {
-  const hoje = new Date().toISOString().split('T')[0];
+function abrirModalFeito(item) {
+  const editar = !!item;
+  const hoje   = new Date().toISOString().split('T')[0];
   openModal(
-    'Registrar Manutenção Feita',
+    editar ? 'Editar Manutenção' : 'Registrar Manutenção Feita',
     `<div class="form-group">
        <label>Data</label>
-       <input type="date" id="ft-data" value="${hoje}">
+       <input type="date" id="ft-data" value="${editar ? item.data : hoje}">
      </div>
      <div class="form-group">
        <label>Descrição</label>
-       <input type="text" id="ft-descricao" placeholder="Ex: Troca de óleo">
+       <input type="text" id="ft-descricao" value="${editar ? esc(item.descricao) : ''}" placeholder="Ex: Troca de óleo">
      </div>
      <div class="form-group">
        <label>Valor (R$)</label>
-       <input type="number" id="ft-valor" step="0.01" min="0" placeholder="0,00">
+       <input type="number" id="ft-valor" value="${editar ? item.valor : ''}" step="0.01" min="0" placeholder="0,00">
      </div>`,
     async () => {
       const data      = document.getElementById('ft-data').value;
@@ -183,11 +207,16 @@ function abrirModalFeito() {
         showToast('Preencha data e descrição.', 'error'); return;
       }
       try {
-        await addDoc(collection(db, 'carro_feitos'), { data, descricao, valor });
-        showToast('Manutenção registrada!', 'success');
-      } catch { showToast('Erro ao registrar.', 'error'); }
+        if (editar) {
+          await updateDoc(doc(db, 'carro_feitos', item.id), { data, descricao, valor });
+          showToast('Manutenção atualizada!', 'success');
+        } else {
+          await addDoc(collection(db, 'carro_feitos'), { data, descricao, valor });
+          showToast('Manutenção registrada!', 'success');
+        }
+      } catch { showToast('Erro ao salvar.', 'error'); }
     },
-    'Registrar'
+    editar ? 'Salvar' : 'Registrar'
   );
 }
 
