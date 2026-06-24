@@ -46,6 +46,18 @@
           <span class="nav-label">Contas Casa</span>
         </a>
       </li>
+      <li>
+        <a href="#" class="nav-link" data-section="carro">
+          <span class="nav-icon">🚗</span>
+          <span class="nav-label">Carro</span>
+        </a>
+      </li>
+      <li>
+        <a href="#" class="nav-link" data-section="devo-devem">
+          <span class="nav-icon">💸</span>
+          <span class="nav-label">Devo / Devem</span>
+        </a>
+      </li>
     </ul>
     <div class="sidebar-footer">
       <span class="user-email-sidebar" id="user-email-sidebar"></span>
@@ -92,21 +104,23 @@
           </table>
         </div>
 
-        <div class="card stat-card">
-          <div class="stat-icon">📅</div>
-          <div class="stat-info">
-            <div class="stat-value" id="dash-orcamento">R$ —</div>
-            <div class="stat-label">Orçamento Mês Atual</div>
-            <div class="stat-sub" id="dash-orcamento-label">Total da Distribuição Mensal</div>
+        <div class="card stat-card orcamento-duplo">
+          <div class="orcamento-item">
+            <div class="stat-icon">📅</div>
+            <div class="stat-info">
+              <div class="stat-value" id="dash-orcamento">R$ —</div>
+              <div class="stat-label">Orçamento Mês Atual</div>
+              <div class="stat-sub" id="dash-orcamento-label">Total da Distribuição Mensal</div>
+            </div>
           </div>
-        </div>
-
-        <div class="card stat-card">
-          <div class="stat-icon">📆</div>
-          <div class="stat-info">
-            <div class="stat-value" id="dash-orcamento-proximo">R$ —</div>
-            <div class="stat-label">Orçamento Mês Seguinte</div>
-            <div class="stat-sub" id="dash-orcamento-proximo-label">Total da Distribuição Mensal</div>
+          <div class="stat-divider"></div>
+          <div class="orcamento-item">
+            <div class="stat-icon">📆</div>
+            <div class="stat-info">
+              <div class="stat-value" id="dash-orcamento-proximo">R$ —</div>
+              <div class="stat-label">Orçamento Mês Seguinte</div>
+              <div class="stat-sub" id="dash-orcamento-proximo-label">Total da Distribuição Mensal</div>
+            </div>
           </div>
         </div>
 
@@ -125,6 +139,26 @@
             <div class="stat-value" id="dash-investimentos">R$ —</div>
             <div class="stat-label">Total em Investimentos</div>
             <div class="stat-sub">Patrimônio acumulado</div>
+          </div>
+        </div>
+
+        <div class="card stat-card orcamento-duplo">
+          <div class="orcamento-item">
+            <div class="stat-icon">💸</div>
+            <div class="stat-info">
+              <div class="stat-value text-danger" id="dash-devo">R$ —</div>
+              <div class="stat-label">Total que Devo</div>
+              <div class="stat-sub">Parcelas em aberto</div>
+            </div>
+          </div>
+          <div class="stat-divider"></div>
+          <div class="orcamento-item">
+            <div class="stat-icon">🤝</div>
+            <div class="stat-info">
+              <div class="stat-value text-success" id="dash-devem">R$ —</div>
+              <div class="stat-label">Total que Devem</div>
+              <div class="stat-sub">Parcelas em aberto</div>
+            </div>
           </div>
         </div>
 
@@ -321,6 +355,198 @@
           <span class="notas-status" id="notas-status-contas-casa"></span>
         </div>
         <textarea class="notas-textarea" id="notas-contas-casa" placeholder="Deixe recados para você mesmo…"></textarea>
+      </div>
+    </section>
+
+    <!-- ===== SECTION: CARRO ===== -->
+    <section id="section-carro" class="content-section">
+
+      <!-- A FAZER -->
+      <div class="card">
+        <div class="card-header">
+          <h3 class="card-title">🔧 A Fazer</h3>
+          <button id="btn-add-afazer" class="btn btn-primary">+ Novo Item</button>
+        </div>
+        <table class="data-table" id="carro-afazer-table">
+          <thead>
+            <tr>
+              <th style="width:80px;text-align:center">Prioridade</th>
+              <th>Descrição</th>
+              <th class="text-right">Valor estimado</th>
+              <th style="width:90px"></th>
+            </tr>
+          </thead>
+          <tbody><tr><td colspan="4" class="loading">Carregando...</td></tr></tbody>
+          <tfoot>
+            <tr>
+              <td colspan="2"><strong>Total estimado</strong></td>
+              <td class="text-right"><strong id="carro-afazer-total">R$ 0,00</strong></td>
+              <td></td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+
+      <!-- FEITOS -->
+      <div class="card">
+        <div class="card-header">
+          <h3 class="card-title">✅ Feitos</h3>
+          <button id="btn-add-feito" class="btn btn-primary">+ Registrar</button>
+        </div>
+        <table class="data-table" id="carro-feitos-table">
+          <thead>
+            <tr>
+              <th>Data</th>
+              <th>Descrição</th>
+              <th class="text-right">Valor</th>
+              <th style="width:60px"></th>
+            </tr>
+          </thead>
+          <tbody><tr><td colspan="4" class="loading">Carregando...</td></tr></tbody>
+          <tfoot>
+            <tr>
+              <td colspan="2"><strong>Total gasto</strong></td>
+              <td class="text-right"><strong id="carro-feitos-total">R$ 0,00</strong></td>
+              <td></td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+
+      <!-- MANUTENÇÃO PREVENTIVA -->
+      <div class="card">
+        <div class="card-header">
+          <h3 class="card-title">📅 Manutenção Preventiva</h3>
+          <button id="btn-add-manutencao" class="btn btn-primary">+ Adicionar</button>
+        </div>
+        <div class="table-wrapper">
+          <table class="data-table" id="carro-manutencao-table">
+            <thead>
+              <tr>
+                <th>Descrição</th>
+                <th>Última troca</th>
+                <th>KM última</th>
+                <th>KM próxima</th>
+                <th class="text-right">Valor</th>
+                <th style="width:90px"></th>
+              </tr>
+            </thead>
+            <tbody><tr><td colspan="6" class="loading">Carregando...</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="notas-card">
+        <div class="notas-header">
+          <span class="notas-icon">📝</span>
+          <span class="notas-title">Anotações</span>
+          <span class="notas-status" id="notas-status-carro"></span>
+        </div>
+        <textarea class="notas-textarea" id="notas-carro" placeholder="Deixe recados sobre o carro…"></textarea>
+      </div>
+    </section>
+
+    <!-- ===== SECTION: DEVO E DEVEM ===== -->
+    <section id="section-devo-devem" class="content-section">
+
+      <!-- FORMULÁRIO -->
+      <div class="card">
+        <div class="card-header">
+          <h3 class="card-title">Registrar Dívida</h3>
+        </div>
+        <form id="dd-form" class="form-inline">
+          <div class="radio-group-inline">
+            <label class="radio-label devo-label">
+              <input type="radio" name="dd-tipo" value="Devo" checked>
+              <span>Devo</span>
+            </label>
+            <label class="radio-label devem-label">
+              <input type="radio" name="dd-tipo" value="Devem">
+              <span>Devem</span>
+            </label>
+          </div>
+          <div class="form-group">
+            <input type="text" id="dd-descricao" placeholder="Descrição" required>
+          </div>
+          <div class="form-group dd-parcelas-group">
+            <input type="number" id="dd-parcelas" placeholder="Parcelas" min="1" step="1">
+          </div>
+          <div class="form-group">
+            <input type="number" id="dd-valor" placeholder="Valor total R$" step="0.01" min="0.01" required>
+          </div>
+          <div class="form-group dd-data-group">
+            <input type="text" id="dd-data" placeholder="MM-AAAA" maxlength="7">
+          </div>
+          <button type="submit" class="btn btn-primary">Registrar</button>
+        </form>
+      </div>
+
+      <!-- TABELAS -->
+      <div class="tables-2col">
+        <div class="card">
+          <div class="card-header">
+            <h3 class="card-title text-danger">Devo</h3>
+            <div class="dd-header-controls">
+              <input type="month" id="dd-devo-mes" class="month-picker">
+              <label class="dd-filter-check">
+                <input type="checkbox" id="dd-devo-fechadas">
+                <span>Mostrar fechadas</span>
+              </label>
+            </div>
+            <span class="dd-total-label">Em aberto: <strong id="dd-devo-total">R$ 0,00</strong></span>
+          </div>
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Mês</th>
+                <th>Descrição</th>
+                <th class="text-right">Valor</th>
+                <th style="text-align:center">Status</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="dd-devo-tbody">
+              <tr><td colspan="5" class="loading">Carregando...</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <h3 class="card-title text-success">Devem</h3>
+            <div class="dd-header-controls">
+              <input type="month" id="dd-devem-mes" class="month-picker">
+              <label class="dd-filter-check">
+                <input type="checkbox" id="dd-devem-fechadas">
+                <span>Mostrar fechadas</span>
+              </label>
+            </div>
+            <span class="dd-total-label">A receber: <strong id="dd-devem-total">R$ 0,00</strong></span>
+          </div>
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Mês</th>
+                <th>Descrição</th>
+                <th class="text-right">Valor</th>
+                <th style="text-align:center">Status</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="dd-devem-tbody">
+              <tr><td colspan="5" class="loading">Carregando...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="notas-card">
+        <div class="notas-header">
+          <span class="notas-icon">📝</span>
+          <span class="notas-title">Anotações</span>
+          <span class="notas-status" id="notas-status-devo-devem"></span>
+        </div>
+        <textarea class="notas-textarea" id="notas-devo-devem" placeholder="Observações sobre dívidas…"></textarea>
       </div>
     </section>
 

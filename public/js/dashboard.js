@@ -12,7 +12,8 @@ export async function initDashboard() {
     carregarOrcamentoMensal(),
     carregarOrcamentoProximoMes(),
     carregarContasCasaMes(),
-    carregarTotalInvestimentos()
+    carregarTotalInvestimentos(),
+    carregarDevoDeve()
   ]);
 }
 
@@ -137,5 +138,26 @@ async function carregarTotalInvestimentos() {
     el.textContent = fmtBRL(total);
   } catch {
     el.textContent = '—';
+  }
+}
+
+async function carregarDevoDeve() {
+  const elDevo  = document.getElementById('dash-devo');
+  const elDevem = document.getElementById('dash-devem');
+  try {
+    const snap = await getDocs(collection(db, 'dividas'));
+    let totalDevo  = 0;
+    let totalDevem = 0;
+    snap.docs.forEach(d => {
+      const data = d.data();
+      if (data.status !== 'Aberta') return;
+      if (data.tipo === 'Devo')  totalDevo  += parseFloat(data.valor) || 0;
+      if (data.tipo === 'Devem') totalDevem += parseFloat(data.valor) || 0;
+    });
+    elDevo.textContent  = fmtBRL(totalDevo);
+    elDevem.textContent = fmtBRL(totalDevem);
+  } catch {
+    elDevo.textContent  = '—';
+    elDevem.textContent = '—';
   }
 }

@@ -440,7 +440,7 @@ input, select, textarea { font-family: inherit; font-size: inherit; }
   gap: 1.25rem;
 }
 
-/* As três stat cards ficam na segunda linha lado a lado */
+/* Stat cards base */
 .dashboard-grid .stat-card {
   display: flex;
   align-items: center;
@@ -448,27 +448,46 @@ input, select, textarea { font-family: inherit; font-size: inherit; }
   padding: 1.25rem;
 }
 
-/* Remapeia grade para 3 colunas na linha das stat cards */
-.dashboard-grid .card:nth-child(3),
-.dashboard-grid .card:nth-child(4),
-.dashboard-grid .card:nth-child(5) {
-  grid-column: span 1;
+/* Card de orçamento unificado: dois itens lado a lado */
+.orcamento-duplo {
+  gap: 0;
 }
 
-/* Override: linha das stats em 3 col */
+.orcamento-item {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex: 1;
+  padding: 0 1.5rem;
+}
+
+.orcamento-item:first-child {
+  padding-left: 0;
+}
+
+.stat-divider {
+  width: 1px;
+  height: 3rem;
+  background: var(--border);
+  flex-shrink: 0;
+}
+
+/* Grid do dashboard */
 @media (min-width: 900px) {
   .dashboard-grid {
     grid-template-columns: 1fr 1fr;
-    grid-template-rows: auto auto;
+    grid-template-rows: auto auto auto;
   }
-  /* Força os stat cards (3,4,5) numa linha de 3 colunas */
-  .dashboard-grid .card:nth-child(3) { grid-column: 1; grid-row: 2; }
-  .dashboard-grid .card:nth-child(4) { grid-column: 2; grid-row: 2; }
-  .dashboard-grid .card:nth-child(5) {
+  /* Orçamento unificado ocupa linha inteira */
+  .dashboard-grid .card:nth-child(3) {
     grid-column: 1 / -1;
-    grid-row: 3;
-    max-width: 360px;
+    grid-row: 2;
   }
+  /* Contas casa e Investimentos lado a lado na linha 3 */
+  .dashboard-grid .card:nth-child(4) { grid-column: 1; grid-row: 3; }
+  .dashboard-grid .card:nth-child(5) { grid-column: 2; grid-row: 3; }
+  /* Devo/Devem ocupa linha inteira na linha 4 */
+  .dashboard-grid .card:nth-child(6) { grid-column: 1 / -1; grid-row: 4; }
 }
 
 .stat-icon { font-size: 2.25rem; flex-shrink: 0; }
@@ -869,6 +888,86 @@ th[draggable]:active { cursor: grabbing; }
 .pagante-bella {
   background: #FCE4EC;
   color: #AD1457;
+}
+
+/* ============================================================
+   DEVO E DEVEM
+   ============================================================ */
+
+/* Radio labels Devo/Devem */
+.radio-label:has(input:checked).devo-label {
+  border-color: var(--danger);
+  background: var(--danger-light);
+  color: var(--danger);
+}
+
+.radio-label:has(input:checked).devem-label {
+  border-color: var(--success);
+  background: var(--success-light);
+  color: var(--success-text);
+}
+
+/* Form fields de tamanho fixo */
+.dd-parcelas-group { max-width: 120px; }
+.dd-data-group     { max-width: 150px; }
+
+/* Total em aberto */
+.dd-total-label {
+  font-size: 0.8125rem;
+  color: var(--text-secondary);
+}
+.dd-total-label strong { color: var(--text); }
+
+/* Agrupador de controles do header (mes picker + checkbox) */
+.dd-header-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  background: var(--primary-light);
+  border: 1px solid #BBDEFB;
+  border-radius: 8px;
+  padding: 0.3rem 0.75rem;
+}
+
+/* Filtro "Mostrar fechadas" */
+.dd-filter-check {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.8125rem;
+  color: var(--text-secondary);
+  cursor: pointer;
+  user-select: none;
+}
+
+.dd-filter-check input[type="checkbox"] {
+  width: 15px;
+  height: 15px;
+  accent-color: var(--primary);
+  cursor: pointer;
+}
+
+/* Status badge clicável */
+.status-badge {
+  display: inline-block;
+  padding: 0.2rem 0.65rem;
+  border-radius: 20px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: opacity 0.15s;
+  user-select: none;
+}
+.status-badge:hover { opacity: 0.75; }
+
+.status-aberta {
+  background: #FFF3E0;
+  color: #E65100;
+}
+
+.status-fechada {
+  background: var(--success-light);
+  color: var(--success-text);
 }
 
 /* ============================================================

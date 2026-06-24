@@ -3,6 +3,8 @@ import { initBanco }       from './banco.js';
 import { initDistribuicao} from './distribuicao.js';
 import { initPatrimonio }  from './patrimonio.js';
 import { initContasCasa }  from './contas-casa.js';
+import { initCarro }       from './carro.js';
+import { initDevoDeve }    from './devo-devem.js';
 import { auth, onAuthStateChanged } from './auth.js';
 import { initNotas }       from './notas.js';
 
@@ -81,7 +83,9 @@ const SECTION_TITLES = {
   banco:        'Banco — Mercado Pago',
   distribuicao: 'Distribuição Mensal do Salário',
   patrimonio:   'Patrimônio e Investimentos',
-  'contas-casa':'Contas da Casa'
+  'contas-casa':'Contas da Casa',
+  carro:        'Carro',
+  'devo-devem': 'Devo e Devem'
 };
 
 const initialized = new Set();
@@ -110,6 +114,8 @@ function activateSection(name) {
     if (name === 'distribuicao') initDistribuicao();
     if (name === 'patrimonio')   initPatrimonio();
     if (name === 'contas-casa')  initContasCasa();
+    if (name === 'carro')        initCarro();
+    if (name === 'devo-devem')   initDevoDeve();
     initNotas(name);
   }
 }
