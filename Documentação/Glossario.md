@@ -40,3 +40,4 @@ Termos usados nos arquivos de documentação deste projeto.
 | **Deploy** | Publicação de uma versão do código em produção (ex: deploy no Firebase Hosting) |
 | **CI/CD** | Continuous Integration / Continuous Deployment — automação de testes e publicações |
 | **Plano Spark** | Plano gratuito do Firebase (50k leituras/dia, 20k gravações/dia, 20k exclusões/dia) |
+| **Render** | site que escuta o bot do telegram para receber mensagem, mesmo que o railway, mas esse é o que estou usando por ser gratuito forever |
