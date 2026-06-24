@@ -10,15 +10,22 @@
 import { db } from './firebase-config.js';
 import { fmtBRL, fmtDate, showToast, openModal } from './app.js';
 import {
-  collection, query, orderBy, onSnapshot,
+  collection, query, orderBy, where, onSnapshot,
   addDoc, deleteDoc, updateDoc, doc
 } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
 
-let afazer        = [];
-let feitos        = [];
-let manutencao    = [];
-let unsubs        = [];
+let afazer         = [];
+let feitos         = [];
+let manutencao     = [];
+let unsubs         = [];
 let feitosVisiveis = 5;
+let mostrarAntigos = false;
+
+function corteUmAno() {
+  const d = new Date();
+  d.setFullYear(d.getFullYear() - 1);
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
 
 export function initFocus() {
   document.getElementById('btn-add-afazer-focus').addEventListener('click',     () => abrirModalAfazer());
@@ -37,8 +44,12 @@ function subscribeAll() {
     () => showToast('Erro ao carregar A Fazer.', 'error')
   ));
 
+  const feitosConstraints = [];
+  if (!mostrarAntigos) feitosConstraints.push(where('data', '>=', corteUmAno()));
+  feitosConstraints.push(orderBy('data', 'desc'));
+
   unsubs.push(onSnapshot(
-    query(collection(db, 'focus_feitos'), orderBy('data', 'desc')),
+    query(collection(db, 'focus_feitos'), ...feitosConstraints),
     snap => { feitos = snap.docs.map(d => ({ id: d.id, ...d.data() })); renderFeitos(); },
     () => showToast('Erro ao carregar Feitos.', 'error')
   ));
@@ -161,6 +172,12 @@ function renderFeitos() {
         <button id="btn-feitos-mais-focus" class="btn-secondary">Carregar mais (${restantes})</button>
       </td>
     </tr>`;
+  } else if (!mostrarAntigos) {
+    tbody.innerHTML += `<tr>
+      <td colspan="4" style="text-align:center;padding:.6rem 0">
+        <button class="btn-secondary btn-focus-antigos" style="font-size:.8rem">Carregar histórico completo</button>
+      </td>
+    </tr>`;
   }
 
   totalEl.textContent = fmtBRL(total);
@@ -178,6 +195,15 @@ function renderFeitos() {
   const btnMais = document.getElementById('btn-feitos-mais-focus');
   if (btnMais) {
     btnMais.addEventListener('click', () => { feitosVisiveis += 5; renderFeitos(); });
+  }
+
+  const btnAntigos = tbody.querySelector('.btn-focus-antigos');
+  if (btnAntigos) {
+    btnAntigos.addEventListener('click', () => {
+      mostrarAntigos = true;
+      feitosVisiveis = 5;
+      subscribeAll();
+    });
   }
 }
 

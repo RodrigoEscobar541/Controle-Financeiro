@@ -1,15 +1,22 @@
 import { db } from './firebase-config.js';
 import { fmtBRL, fmtDate, showToast, openModal } from './app.js';
 import {
-  collection, query, orderBy, onSnapshot,
-  addDoc, deleteDoc, doc, serverTimestamp
+  collection, query, orderBy, where, onSnapshot,
+  addDoc, deleteDoc, doc
 } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
 
-let unsubscribe = null;
+let unsubscribe  = null;
+let mostrarAntigos = false;
 
 export function initBanco() {
   renderForm();
   subscribeTransacoes();
+}
+
+function corteUmAno() {
+  const d = new Date();
+  d.setFullYear(d.getFullYear() - 1);
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
 }
 
 function renderForm() {
@@ -41,7 +48,11 @@ function renderForm() {
 function subscribeTransacoes() {
   if (unsubscribe) unsubscribe();
 
-  const q = query(collection(db, 'banco'), orderBy('data', 'desc'));
+  const constraints = [];
+  if (!mostrarAntigos) constraints.push(where('data', '>=', corteUmAno()));
+  constraints.push(orderBy('data', 'desc'));
+
+  const q = query(collection(db, 'banco'), ...constraints);
   unsubscribe = onSnapshot(q, snap => {
     const docs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
     renderTabela(docs.filter(r => r.tipo === 'Entrada'), 'banco-entradas', 'success');
@@ -56,23 +67,34 @@ function renderTabela(docs, tableId, colorClass) {
 
   if (docs.length === 0) {
     tbody.innerHTML = `<tr><td colspan="4" class="empty-state">Nenhum registro</td></tr>`;
-    return;
+  } else {
+    tbody.innerHTML = docs.map(d => `
+      <tr>
+        <td>${fmtDate(d.data)}</td>
+        <td>${d.descricao}</td>
+        <td class="text-right text-${colorClass}">${fmtBRL(d.valor)}</td>
+        <td style="text-align:center">
+          <button class="btn-icon" data-id="${d.id}" title="Excluir">🗑️</button>
+        </td>
+      </tr>
+    `).join('');
+
+    tbody.querySelectorAll('.btn-icon').forEach(btn => {
+      btn.addEventListener('click', () => confirmarExclusao(btn.dataset.id));
+    });
   }
 
-  tbody.innerHTML = docs.map(d => `
-    <tr>
-      <td>${fmtDate(d.data)}</td>
-      <td>${d.descricao}</td>
-      <td class="text-right text-${colorClass}">${fmtBRL(d.valor)}</td>
-      <td style="text-align:center">
-        <button class="btn-icon" data-id="${d.id}" title="Excluir">🗑️</button>
-      </td>
-    </tr>
-  `).join('');
-
-  tbody.querySelectorAll('.btn-icon').forEach(btn => {
-    btn.addEventListener('click', () => confirmarExclusao(btn.dataset.id));
-  });
+  if (!mostrarAntigos) {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td colspan="4" style="text-align:center;padding:.5rem 0">
+      <button class="btn-secondary btn-banco-antigos" style="font-size:.8rem">Carregar histórico completo</button>
+    </td>`;
+    tbody.appendChild(tr);
+    tr.querySelector('.btn-banco-antigos').addEventListener('click', () => {
+      mostrarAntigos = true;
+      subscribeTransacoes();
+    });
+  }
 }
 
 function confirmarExclusao(id) {

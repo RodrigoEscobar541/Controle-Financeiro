@@ -12,7 +12,7 @@
 import { db } from './firebase-config.js';
 import { fmtBRL, showToast, openModal } from './app.js';
 import {
-  collection, query, orderBy, onSnapshot,
+  collection, query, orderBy, where, onSnapshot,
   addDoc, deleteDoc, updateDoc, doc
 } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
 
@@ -22,6 +22,13 @@ let filtroMesDevo       = '';
 let filtroMesDevem      = '';
 let mostrarFechadasDevo  = false;
 let mostrarFechadasDevem = false;
+let mostrarAntigos      = false;
+
+function corteUmAno() {
+  const d = new Date();
+  d.setFullYear(d.getFullYear() - 1);
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+}
 
 export function initDevoDeve() {
   const mesAtual = mesAtualYYYYMM();
@@ -146,7 +153,11 @@ function aplicarFiltro(lista, filtroMes, mostrarFechadas) {
 function subscribeDividas() {
   if (unsubscribe) unsubscribe();
 
-  const q = query(collection(db, 'dividas'), orderBy('data', 'asc'));
+  const constraints = [];
+  if (!mostrarAntigos) constraints.push(where('data', '>=', corteUmAno()));
+  constraints.push(orderBy('data', 'asc'));
+
+  const q = query(collection(db, 'dividas'), ...constraints);
   unsubscribe = onSnapshot(q, snap => {
     dividas = snap.docs.map(d => ({ id: d.id, ...d.data() }));
     renderTabelas();
@@ -159,6 +170,19 @@ function renderTabelas() {
 
   renderTabela(aplicarFiltro(devo,  filtroMesDevo,  mostrarFechadasDevo),  devo,  'dd-devo-tbody',  'dd-devo-total');
   renderTabela(aplicarFiltro(devem, filtroMesDevem, mostrarFechadasDevem), devem, 'dd-devem-tbody', 'dd-devem-total');
+
+  if (!mostrarAntigos) {
+    const devoTbody = document.getElementById('dd-devo-tbody');
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td colspan="5" style="text-align:center;padding:.5rem 0">
+      <button class="btn-secondary btn-dd-antigos" style="font-size:.8rem">Carregar histórico completo (mais de 1 ano)</button>
+    </td>`;
+    devoTbody.appendChild(tr);
+    tr.querySelector('.btn-dd-antigos').addEventListener('click', () => {
+      mostrarAntigos = true;
+      subscribeDividas();
+    });
+  }
 }
 
 function renderTabela(listaFiltrada, listaCompleta, tbodyId, totalId) {

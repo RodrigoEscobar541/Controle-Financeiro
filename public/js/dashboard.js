@@ -1,7 +1,7 @@
 import { db } from './firebase-config.js';
 import { fmtBRL, fmtDate, mesAtualId, idToLabel, mesAtualLabel } from './app.js';
 import {
-  collection, query, orderBy, limit, getDocs, doc, getDoc
+  collection, query, orderBy, where, limit, getDocs, doc, getDoc
 } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
 
 // Limita 5 leituras por tabela e usa os dados cacheados no dashboard
@@ -145,12 +145,12 @@ async function carregarDevoDeve() {
   const elDevo  = document.getElementById('dash-devo');
   const elDevem = document.getElementById('dash-devem');
   try {
-    const snap = await getDocs(collection(db, 'dividas'));
+    const q    = query(collection(db, 'dividas'), where('status', '==', 'Aberta'));
+    const snap = await getDocs(q);
     let totalDevo  = 0;
     let totalDevem = 0;
     snap.docs.forEach(d => {
       const data = d.data();
-      if (data.status !== 'Aberta') return;
       if (data.tipo === 'Devo')  totalDevo  += parseFloat(data.valor) || 0;
       if (data.tipo === 'Devem') totalDevem += parseFloat(data.valor) || 0;
     });

@@ -37,12 +37,11 @@ async function getTotalInvestimentos(db) {
 }
 
 async function getTotalDividas(db) {
-  const snap = await db.collection('dividas').get();
+  const snap = await db.collection('dividas').where('status', '==', 'Aberta').get();
   let totalDevo  = 0;
   let totalDevem = 0;
   snap.docs.forEach(d => {
     const data = d.data();
-    if (data.status !== 'Aberta') return;
     if (data.tipo === 'Devo')  totalDevo  += parseFloat(data.valor) || 0;
     if (data.tipo === 'Devem') totalDevem += parseFloat(data.valor) || 0;
   });
