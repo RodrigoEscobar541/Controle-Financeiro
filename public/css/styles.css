@@ -971,26 +971,233 @@ th[draggable]:active { cursor: grabbing; }
 }
 
 /* ============================================================
+   MENU TOGGLE (hamburguer mobile)
+   ============================================================ */
+.menu-toggle {
+  display: none;
+  background: none;
+  border: none;
+  font-size: 1.375rem;
+  color: var(--text);
+  padding: 0.4rem 0.5rem;
+  border-radius: 8px;
+  line-height: 1;
+  cursor: pointer;
+  min-width: 40px;
+  min-height: 40px;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  margin-right: 0.25rem;
+}
+.menu-toggle:hover { background: var(--bg); }
+
+/* Backdrop para fechar sidebar no mobile */
+.sidebar-backdrop {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(10, 15, 40, 0.5);
+  z-index: 150;
+  backdrop-filter: blur(1px);
+  cursor: pointer;
+}
+
+/* ============================================================
    RESPONSIVE
    ============================================================ */
+
+/* Tablet (769px – 1024px) */
+@media (max-width: 1024px) and (min-width: 769px) {
+  :root { --sidebar-width: 185px; }
+  .content-section { padding: 1.25rem; }
+  .card-actions { flex-wrap: wrap; gap: 0.4rem; }
+  .stat-value { font-size: 1.3rem; }
+  .stat-icon { font-size: 1.875rem; }
+  .period-filter { flex-wrap: wrap; }
+}
+
+/* Mobile (≤ 768px) */
 @media (max-width: 768px) {
-  :root { --sidebar-width: 60px; }
-
-  .sidebar-title, .nav-label, .user-email-sidebar { display: none; }
-
-  .nav-link { justify-content: center; padding: 0.75rem; }
-
-  .main-content { margin-left: var(--sidebar-width); }
-
-  .dashboard-grid, .tables-2col {
-    grid-template-columns: 1fr;
+  :root {
+    --sidebar-width: 265px;
+    --topbar-height: 56px;
   }
 
-  .card-header { flex-wrap: wrap; gap: 0.5rem; }
+  /* HAMBURGUER */
+  .menu-toggle { display: inline-flex; }
 
-  .form-inline { flex-direction: column; }
+  /* BACKDROP */
+  body.sidebar-open .sidebar-backdrop { display: block; }
 
-  .content-section { padding: 1rem; }
+  /* SIDEBAR — drawer oculto, desliza ao abrir */
+  .sidebar {
+    transform: translateX(-100%);
+    transition: transform 0.28s cubic-bezier(0.4, 0, 0.2, 1);
+    z-index: 200;
+    box-shadow: 4px 0 32px rgba(0, 0, 0, 0.3);
+  }
+  body.sidebar-open .sidebar { transform: translateX(0); }
 
-  .top-bar { padding: 0 1rem; }
+  /* Restaurar labels da sidebar (que ficavam ocultos no ícone 60px) */
+  .sidebar-title { display: inline; }
+  .nav-label,
+  .user-email-sidebar { display: block; }
+
+  /* Nav links com alinhamento à esquerda */
+  .nav-link {
+    justify-content: flex-start;
+    padding: 0.875rem 1rem;
+    min-height: 48px;
+  }
+
+  /* MAIN CONTENT — largura total, sem margem da sidebar */
+  .main-content { margin-left: 0; }
+
+  /* TOP BAR */
+  .top-bar {
+    padding: 0 1rem;
+    height: var(--topbar-height);
+  }
+  .page-title {
+    font-size: 1rem;
+    flex: 1;
+  }
+  .current-date { display: none; }
+
+  /* SEÇÕES */
+  .content-section { padding: 0.875rem; }
+
+  /* GRIDS — coluna única */
+  .dashboard-grid,
+  .tables-2col {
+    grid-template-columns: 1fr;
+    gap: 0.875rem;
+  }
+
+  /* Desfaz posicionamento explícito do grid do dashboard */
+  .dashboard-grid .card:nth-child(n) {
+    grid-column: auto;
+    grid-row: auto;
+  }
+
+  /* ORCAMENTO DUPLO — empilhar verticalmente */
+  .orcamento-duplo { flex-direction: column; }
+  .orcamento-item {
+    padding: 1rem 1.25rem;
+    flex: unset;
+  }
+  .orcamento-item:first-child { padding-left: 1.25rem; }
+  .stat-divider {
+    width: auto;
+    height: 1px;
+    margin: 0 1.25rem;
+  }
+
+  /* CARDS — scroll horizontal para tabelas sem wrapper */
+  .card {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  .card-header {
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    padding: 0.875rem 1rem;
+  }
+  .card-actions {
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    width: 100%;
+  }
+
+  /* PERIOD FILTER */
+  .period-filter { flex-wrap: wrap; }
+  .month-picker { min-width: 108px; }
+
+  /* FORMULÁRIOS — empilhar em coluna */
+  .form-inline {
+    flex-direction: column;
+    gap: 0.625rem;
+    padding: 0.875rem 1rem 1rem;
+  }
+  .form-inline .form-group {
+    min-width: unset;
+    width: 100%;
+    margin-bottom: 0;
+  }
+  .radio-group-inline { width: 100%; }
+  .radio-label {
+    flex: 1;
+    justify-content: center;
+    min-height: 44px;
+  }
+
+  /* BOTÕES — alvos de toque acessíveis (44px mínimo) */
+  .btn {
+    min-height: 44px;
+    padding: 0.75rem 1.25rem;
+  }
+  .btn-full { min-height: 48px; }
+  .btn-icon {
+    min-height: 38px;
+    min-width: 38px;
+    padding: 0.4rem 0.6rem;
+  }
+
+  /* INPUTS — 16px evita zoom automático no iOS */
+  .form-group input,
+  .form-group select {
+    min-height: 44px;
+    font-size: 1rem;
+  }
+
+  /* DEVO / DEVEM */
+  .dd-parcelas-group,
+  .dd-data-group { max-width: unset; width: 100%; }
+  .dd-header-controls { flex-wrap: wrap; gap: 0.4rem; }
+
+  /* MODAL */
+  .modal {
+    max-width: calc(100vw - 2rem);
+    margin: 0 1rem;
+    border-radius: 16px;
+  }
+
+  /* TOAST */
+  .toast {
+    left: 1rem;
+    right: 1rem;
+    bottom: 1rem;
+    max-width: unset;
+    text-align: center;
+  }
+
+  /* TABLE WRAPPER */
+  .table-wrapper {
+    padding: 0;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  .table-hint { padding: 0.5rem 1rem 0; font-size: 0.75rem; }
+
+  /* STAT CARDS */
+  .dashboard-grid .stat-card { padding: 1rem; }
+  .stat-value { font-size: 1.3rem; }
+  .stat-icon { font-size: 1.875rem; }
+
+  /* MES ATUAL BADGE */
+  .mes-atual-badge { text-align: center; }
+}
+
+/* Telefones pequenos (≤ 420px) */
+@media (max-width: 420px) {
+  .content-section { padding: 0.625rem; }
+  .card-header { padding: 0.75rem; }
+  .stat-value { font-size: 1.15rem; }
+  .stat-icon { font-size: 1.625rem; }
+  .page-title { font-size: 0.9375rem; }
+  .btn { padding: 0.625rem 1rem; }
+  .modal { margin: 0 0.5rem; max-width: calc(100vw - 1rem); }
+  .toast { left: 0.5rem; right: 0.5rem; bottom: 0.5rem; }
+  .login-card { padding: 1.75rem 1.25rem; }
 }

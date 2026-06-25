@@ -143,3 +143,23 @@ if (dateEl) {
 onAuthStateChanged(auth, user => {
   if (user) activateSection('dashboard');
 });
+
+// ──────────────────────────────────────────────
+// SIDEBAR MOBILE TOGGLE
+// ──────────────────────────────────────────────
+const menuToggle    = document.getElementById('menu-toggle');
+const sidebarBackdrop = document.getElementById('sidebar-backdrop');
+
+function closeSidebar() { document.body.classList.remove('sidebar-open'); }
+
+if (menuToggle) {
+  menuToggle.addEventListener('click', () => {
+    document.body.classList.toggle('sidebar-open');
+  });
+}
+if (sidebarBackdrop) {
+  sidebarBackdrop.addEventListener('click', closeSidebar);
+}
+document.querySelectorAll('.nav-link').forEach(link => {
+  link.addEventListener('click', closeSidebar);
+});

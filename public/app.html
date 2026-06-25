@@ -9,6 +9,9 @@
 </head>
 <body class="app-body">
 
+  <!-- Backdrop mobile (fecha sidebar ao tocar fora) -->
+  <div class="sidebar-backdrop" id="sidebar-backdrop"></div>
+
   <!-- Sidebar -->
   <nav class="sidebar">
     <div class="sidebar-header">
@@ -76,6 +79,7 @@
 
     <!-- Top Bar -->
     <div class="top-bar">
+      <button class="menu-toggle" id="menu-toggle" aria-label="Abrir menu">☰</button>
       <h1 class="page-title" id="page-title">Dashboard</h1>
       <div class="top-bar-right">
         <span class="current-date" id="current-date"></span>
