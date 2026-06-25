@@ -5,6 +5,17 @@ const cmdSaida        = require('./commands/saida');
 const cmdEntrada      = require('./commands/entrada');
 const cmdSaldo        = require('./commands/saldo');
 const cmdAgente       = require('./commands/agente');
+const cmdRegGastosFocus       = require('./commands/registrargastosfocus');
+const cmdRegGastosFace        = require('./commands/registrargastosface');
+const cmdRegAfazerFocus       = require('./commands/registrarafazerfocus');
+const cmdRegAfazerFace        = require('./commands/registrarafazerface');
+const cmdValorMesAtual        = require('./commands/valortotalmesatual');
+const cmdValorMesProximo      = require('./commands/valortotalmesproximo');
+const cmdPatrimonioTotal      = require('./commands/patrimoniototal');
+const cmdCriarColDist         = require('./commands/criarcolunadistribuicao');
+const cmdCriarColCasa         = require('./commands/criarcolunacontascasa');
+const cmdDevo                 = require('./commands/devo');
+const cmdDevem                = require('./commands/devem');
 
 // ─── Firebase Admin ──────────────────────────────────────────
 const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
@@ -26,29 +37,53 @@ bot.use((ctx, next) => {
 // ─── Comandos ────────────────────────────────────────────────
 bot.start(ctx => ctx.reply(
   `💰 *Controle Financeiro Bot*\n\n` +
-  `Olá! Esses são os comandos disponíveis:\n\n` +
-  `/saida [descrição] [valor] — Registrar saída\n` +
-  `/entrada [descrição] [valor] — Registrar entrada\n` +
-  `/saldo — Ver saldo atual\n` +
-  `/agente [pergunta] — Consultar o Agente IA\n\n` +
-  `Exemplos:\n` +
-  `/saida cinema 42.90\n` +
-  `/entrada salário 8556\n` +
-  `/agente qual foi meu gasto total este mês?`,
+  `Olá! Use /help para ver todos os comandos.`,
   { parse_mode: 'Markdown' }
 ));
 
 bot.help(ctx => ctx.reply(
+  `📋 *Comandos disponíveis*\n\n` +
+  `*Banco*\n` +
   `/saida [desc] [valor] — Registrar saída\n` +
   `/entrada [desc] [valor] — Registrar entrada\n` +
-  `/saldo — Ver saldo atual\n` +
-  `/agente [pergunta] — Agente IA financeiro`
+  `/saldo — Ver saldo atual\n\n` +
+  `*Focus (carro)*\n` +
+  `/registrargastosfocus [desc] [valor] — Registrar gasto feito\n` +
+  `/registrarafazerfocus [desc] [valor] — Adicionar ao A Fazer\n\n` +
+  `*Face*\n` +
+  `/registrargastosface [desc] [valor] — Registrar gasto feito\n` +
+  `/registrarafazerface [desc] [valor] — Adicionar ao A Fazer\n\n` +
+  `*Distribuição*\n` +
+  `/valortotalmesatual — Ver total do mês atual\n` +
+  `/valortotalmesproximo — Ver total do próximo mês\n` +
+  `/criarcolunadistribuicao [nome] [valor] — Criar coluna\n\n` +
+  `*Contas da Casa*\n` +
+  `/criarcolunacontascasa [nome] [valor] [Bella|Digo] — Criar conta\n\n` +
+  `*Patrimônio*\n` +
+  `/patrimoniototal — Ver patrimônio total\n\n` +
+  `*Devo / Devem*\n` +
+  `/devo [desc] [valor] [parcelas] — Registrar o que devo\n` +
+  `/devem [desc] [valor] [parcelas] — Registrar o que me devem\n\n` +
+  `*IA*\n` +
+  `/agente [pergunta] — Agente IA financeiro`,
+  { parse_mode: 'Markdown' }
 ));
 
-bot.command('saida',   ctx => cmdSaida(ctx, db));
-bot.command('entrada', ctx => cmdEntrada(ctx, db));
-bot.command('saldo',   ctx => cmdSaldo(ctx, db));
-bot.command('agente',  ctx => cmdAgente(ctx));
+bot.command('saida',                    ctx => cmdSaida(ctx, db));
+bot.command('entrada',                  ctx => cmdEntrada(ctx, db));
+bot.command('saldo',                    ctx => cmdSaldo(ctx, db));
+bot.command('agente',                   ctx => cmdAgente(ctx));
+bot.command('registrargastosfocus',     ctx => cmdRegGastosFocus(ctx, db));
+bot.command('registrargastosface',      ctx => cmdRegGastosFace(ctx, db));
+bot.command('registrarafazerfocus',     ctx => cmdRegAfazerFocus(ctx, db));
+bot.command('registrarafazerface',      ctx => cmdRegAfazerFace(ctx, db));
+bot.command('valortotalmesatual',       ctx => cmdValorMesAtual(ctx, db));
+bot.command('valortotalmesproximo',     ctx => cmdValorMesProximo(ctx, db));
+bot.command('patrimoniototal',          ctx => cmdPatrimonioTotal(ctx, db));
+bot.command('criarcolunadistribuicao',  ctx => cmdCriarColDist(ctx, db));
+bot.command('criarcolunacontascasa',    ctx => cmdCriarColCasa(ctx, db));
+bot.command('devo',                     ctx => cmdDevo(ctx, db));
+bot.command('devem',                    ctx => cmdDevem(ctx, db));
 
 bot.on('text', ctx => ctx.reply(
   'Comando não reconhecido. Use /help para ver os comandos disponíveis.'
