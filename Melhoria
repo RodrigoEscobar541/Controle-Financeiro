@@ -1,3 +1,22 @@
-/registrar*gastos*docarro*focus*
+/registrar*gastos*focus* - Adiciona um registro na tabela "feitos" da section "focus" necessario colocar descrição e valor
+/registrar*gastos*face* - Adiciona um registro na tabela "feitos" da section "face", é necessario colocar descrição e valor
+
+/registrar*afazer*face* Adiciona um registro na tabela "A fazer" da section "face", é necessario colocar descrição e valor, prioridade vai para o fim da fila
+/registrar*afazer*focus* Adiciona um registro na tabela "A fazer" da section "focus", é necessario colocar descrição e valor, prioridade vai para o fim da fila
+
+
+/valortotalmes*atual* - Apresenta o valor total da linha do mês atual da tabela da section "distribuição" seguido dos nomes das colunas e seus valores
+
+/valortotalmes*proximo* - Apresenta o valor total da linha do proximo mês da tabela da section "distribuição" seguido dos nomes das colunas e seus valores
+
+/patrimoniototal - Apresenta o total do patrimonio seguido dos itens que há, dizendo ativo, plataforma e valor
+
+/criarcoluna*distribuição* - Cria  uma coluna na section "distribuição" com o nome posto a frente do comando e coloca o valor posto a frente em todos os mesees futuros ativados no BD e visivel na planilha
+
+/criarcoluna*contascasa* - Cria  uma coluna na tabela da section "contas casa" com o nome posto a frente do comando e coloca o valor posto a frente em todos os mesees futuros ativados no BD e visivel na planilha
+
+/Devem - usuario coloca desc, valor e parcelas (se nao colocar parcelas, é em 1 vez) e deve-se criar um registro na tabela devem na section "devo / devem"
+/Devo - usuario coloca desc, valor e parcelas (se nao colocar parcelas, é em 1 vez) e deve-se criar um registro na tabela devo na section "devo / devem"
+
 Adicionar mais comandos por section
 
