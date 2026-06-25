@@ -4,7 +4,6 @@ const admin           = require('firebase-admin');
 const cmdSaida        = require('./commands/saida');
 const cmdEntrada      = require('./commands/entrada');
 const cmdSaldo        = require('./commands/saldo');
-const cmdAgente       = require('./commands/agente');
 const cmdRegGastosFocus       = require('./commands/registrargastosfocus');
 const cmdRegGastosFace        = require('./commands/registrargastosface');
 const cmdRegAfazerFocus       = require('./commands/registrarafazerfocus');
@@ -64,15 +63,13 @@ bot.help(ctx => ctx.reply(
   `*Devo / Devem*\n` +
   `/devo [desc] [valor] [parcelas] — Registrar o que devo\n` +
   `/devem [desc] [valor] [parcelas] — Registrar o que me devem\n\n` +
-  `*IA*\n` +
-  `/agente [pergunta] — Agente IA financeiro`,
+  `Use os comandos acima para gerenciar suas finanças.`,
   { parse_mode: 'Markdown' }
 ));
 
 bot.command('saida',                    ctx => cmdSaida(ctx, db));
 bot.command('entrada',                  ctx => cmdEntrada(ctx, db));
 bot.command('saldo',                    ctx => cmdSaldo(ctx, db));
-bot.command('agente',                   ctx => cmdAgente(ctx));
 bot.command('registrargastosfocus',     ctx => cmdRegGastosFocus(ctx, db));
 bot.command('registrargastosface',      ctx => cmdRegGastosFace(ctx, db));
 bot.command('registrarafazerfocus',     ctx => cmdRegAfazerFocus(ctx, db));
