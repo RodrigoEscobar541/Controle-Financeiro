@@ -54,9 +54,21 @@ O app é organizado como uma planilha com as seguintes seções:
 - Distribuição Mensal: planejamento do salário por mês, cada linha é um mês e cada coluna é uma conta fixa
 - Patrimônio: tabela de ativos e investimentos
 - Contas Casa: gastos da casa por mês, divididos entre Digo e Bella
-- Focus: gastos com o carro Ford Focus (não coberto pelas suas ferramentas)
-- Face: gastos com outro carro (não coberto pelas suas ferramentas)
+- Focus: gastos com o Ford Focus — coleções carro_feitos (gastos feitos) e carro_afazer (lista de serviços pendentes)
+- Face: gastos com o Ecosport/Face — coleções focus_feitos (gastos feitos) e focus_afazer (lista de serviços pendentes)
 - Devo/Devem: controle de dívidas (não coberto pelas suas ferramentas)
+
+7. COLEÇÃO: carro_feitos/{id}  — gastos já realizados no Focus
+   Campos: data (YYYY-MM-DD), descricao (string), valor (número)
+
+8. COLEÇÃO: carro_afazer/{id}  — serviços pendentes/futuros no Focus
+   Campos: prioridade (número, quanto menor = mais urgente), descricao (string), valor (número estimado)
+
+9. COLEÇÃO: focus_feitos/{id}  — gastos já realizados no Face
+   Campos: data (YYYY-MM-DD), descricao (string), valor (número)
+
+10. COLEÇÃO: focus_afazer/{id}  — serviços pendentes/futuros no Face
+    Campos: prioridade (número, quanto menor = mais urgente), descricao (string), valor (número estimado)
 
 REGRAS DE COMPORTAMENTO:
 - Seja direto e objetivo
@@ -207,6 +219,57 @@ const FERRAMENTAS = [
     name: 'consultar_config',
     description: 'Consulta os nomes de colunas configuradas para distribuição mensal e contas da casa.',
     parameters: { type: 'object', properties: {}, required: [] }
+  },
+  {
+    name: 'consultar_carro',
+    description: 'Consulta gastos feitos e lista de serviços a fazer de um dos carros (Focus ou Face).',
+    parameters: {
+      type: 'object',
+      properties: {
+        carro: { type: 'string', description: '"focus" para o Ford Focus, "face" para o Face/Ecosport.' }
+      },
+      required: ['carro']
+    }
+  },
+  {
+    name: 'registrar_gasto_carro',
+    description: 'Registra um gasto já realizado em um dos carros (Focus ou Face).',
+    parameters: {
+      type: 'object',
+      properties: {
+        carro:     { type: 'string', description: '"focus" ou "face".' },
+        descricao: { type: 'string', description: 'Descrição do serviço/gasto (ex: "troca de óleo", "pastilha de freio").' },
+        valor:     { type: 'number', description: 'Valor pago em reais.' },
+        data:      { type: 'string', description: 'Data no formato YYYY-MM-DD. Se omitido, usa hoje.' }
+      },
+      required: ['carro', 'descricao', 'valor']
+    }
+  },
+  {
+    name: 'registrar_afazer_carro',
+    description: 'Adiciona um serviço pendente/futuro à lista "a fazer" de um dos carros. A prioridade é automática (fim da fila).',
+    parameters: {
+      type: 'object',
+      properties: {
+        carro:     { type: 'string', description: '"focus" ou "face".' },
+        descricao: { type: 'string', description: 'Descrição do serviço a fazer (ex: "revisão 60mil km", "alinhar direção").' },
+        valor:     { type: 'number', description: 'Valor estimado em reais.' }
+      },
+      required: ['carro', 'descricao', 'valor']
+    }
+  },
+  {
+    name: 'excluir_item_carro',
+    description: 'Remove um registro de gasto feito ou item da lista a fazer de um dos carros.',
+    parameters: {
+      type: 'object',
+      properties: {
+        carro:   { type: 'string', description: '"focus" ou "face".' },
+        colecao: { type: 'string', description: '"feitos" para gastos realizados, "afazer" para a lista pendente.' },
+        id:      { type: 'string', description: 'ID do documento a excluir.' }
+      },
+      required: ['carro', 'colecao', 'id']
+    }
   }
 ];
 
@@ -362,6 +425,60 @@ async function executarTool(nome, args, db, acoesLog) {
           distribuicao_colunas: distSnap.exists ? distSnap.data() : null,
           contas_casa_colunas:  casaSnap.exists  ? casaSnap.data()  : null
         };
+      }
+
+      case 'consultar_carro': {
+        const isFocus  = args.carro === 'focus';
+        const colFeitos = isFocus ? 'carro_feitos' : 'focus_feitos';
+        const colAfazer = isFocus ? 'carro_afazer' : 'focus_afazer';
+        const nome      = isFocus ? 'Focus' : 'Face';
+
+        const [snapFeitos, snapAfazer] = await Promise.all([
+          db.collection(colFeitos).get(),
+          db.collection(colAfazer).orderBy('prioridade', 'asc').get()
+        ]);
+
+        const feitos = snapFeitos.docs.map(d => ({ id: d.id, ...d.data() }));
+        feitos.sort((a, b) => String(b.data || '').localeCompare(String(a.data || '')));
+        const afazer = snapAfazer.docs.map(d => ({ id: d.id, ...d.data() }));
+
+        const totalFeitos = feitos.reduce((s, d) => s + (parseFloat(d.valor) || 0), 0);
+        const totalAfazer = afazer.reduce((s, d) => s + (parseFloat(d.valor) || 0), 0);
+
+        acoesLog.push({ tipo: 'LEITURA', colecao: `${colFeitos}+${colAfazer}`, descricao: `Consultou carro ${nome}` });
+        return { sucesso: true, carro: nome, feitos, total_gasto: totalFeitos, afazer, total_estimado_afazer: totalAfazer };
+      }
+
+      case 'registrar_gasto_carro': {
+        const isFocus  = args.carro === 'focus';
+        const colecao  = isFocus ? 'carro_feitos' : 'focus_feitos';
+        const data     = args.data || dataHoje;
+        const ref      = await db.collection(colecao).add({ data, descricao: args.descricao, valor: args.valor });
+        acoesLog.push({ tipo: 'ESCRITA', colecao, id: ref.id, descricao: `Gasto ${args.carro}: "${args.descricao}" R$ ${args.valor}` });
+        return { sucesso: true, id: ref.id };
+      }
+
+      case 'registrar_afazer_carro': {
+        const isFocus  = args.carro === 'focus';
+        const colecao  = isFocus ? 'carro_afazer' : 'focus_afazer';
+        const snap     = await db.collection(colecao).orderBy('prioridade', 'desc').limit(1).get();
+        const maxPrio  = snap.empty ? 0 : (snap.docs[0].data().prioridade || 0);
+        const ref      = await db.collection(colecao).add({ prioridade: maxPrio + 1, descricao: args.descricao, valor: args.valor });
+        acoesLog.push({ tipo: 'ESCRITA', colecao, id: ref.id, descricao: `A fazer ${args.carro}: "${args.descricao}" R$ ${args.valor}` });
+        return { sucesso: true, id: ref.id, prioridade: maxPrio + 1 };
+      }
+
+      case 'excluir_item_carro': {
+        const isFocus = args.carro === 'focus';
+        const colecao = args.colecao === 'feitos'
+          ? (isFocus ? 'carro_feitos' : 'focus_feitos')
+          : (isFocus ? 'carro_afazer' : 'focus_afazer');
+        const snap = await db.collection(colecao).doc(args.id).get();
+        if (!snap.exists) return { sucesso: false, erro: `Documento ${args.id} não encontrado em ${colecao}` };
+        const dadosAntes = snap.data();
+        await db.collection(colecao).doc(args.id).delete();
+        acoesLog.push({ tipo: 'EXCLUSAO', colecao, id: args.id, descricao: `Excluiu: "${dadosAntes.descricao}"` });
+        return { sucesso: true, dados_excluidos: dadosAntes };
       }
 
       default:
