@@ -15,6 +15,7 @@ const cmdCriarColDist         = require('./commands/criarcolunadistribuicao');
 const cmdCriarColCasa         = require('./commands/criarcolunacontascasa');
 const cmdDevo                 = require('./commands/devo');
 const cmdDevem                = require('./commands/devem');
+const cmdAgente               = require('./commands/agente');
 
 // ─── Firebase Admin ──────────────────────────────────────────
 const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
@@ -63,6 +64,8 @@ bot.help(ctx => ctx.reply(
   `*Devo / Devem*\n` +
   `/devo [desc] [valor] [parcelas] — Registrar o que devo\n` +
   `/devem [desc] [valor] [parcelas] — Registrar o que me devem\n\n` +
+  `*🤖 Agente IA*\n` +
+  `/agente [mensagem] — Consultor financeiro com IA (Gemini)\n\n` +
   `Use os comandos acima para gerenciar suas finanças.`,
   { parse_mode: 'Markdown' }
 ));
@@ -81,6 +84,7 @@ bot.command('criarcolunadistribuicao',  ctx => cmdCriarColDist(ctx, db));
 bot.command('criarcolunacontascasa',    ctx => cmdCriarColCasa(ctx, db));
 bot.command('devo',                     ctx => cmdDevo(ctx, db));
 bot.command('devem',                    ctx => cmdDevem(ctx, db));
+bot.command('agente',                   ctx => cmdAgente(ctx, db));
 
 bot.on('text', ctx => ctx.reply(
   'Comando não reconhecido. Use /help para ver os comandos disponíveis.'

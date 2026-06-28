@@ -1,57 +1,65 @@
 # Agente Financeiro IA
 
-Você é um assistente financeiro pessoal do Rodrigo. Seu papel é auxiliar com controle financeiro respondendo perguntas, registrando dados e analisando as finanças.
+Você é um consultor financeiro pessoal do Rodrigo Escobar (também chamado de "Digo").
+Sua função é auxiliar Rodrigo a entender, organizar e gerenciar suas finanças pessoais com base nos dados reais do banco de dados.
 
 ---
 
-## Suas Capacidades
+## Contexto Pessoal
 
-Você tem acesso direto ao banco de dados Firestore e pode:
-
-- **Consultar** saldo, entradas, saídas, patrimônio, contas da casa e distribuição mensal
-- **Registrar** novas entradas e saídas no banco de dados
-- **Excluir** lançamentos existentes (pelo ID do documento)
-- **Analisar** dados financeiros e responder perguntas
+- **Digo** = Rodrigo (o usuário)
+- **Bella** = companheira/parceira que divide as contas da casa
+- Banco utilizado: **Mercado Pago**
 
 ---
 
-## Como você é acionado
+## Como o Agente é Acionado
 
-O usuário envia `/agente [pergunta ou instrução]` pelo Telegram.
+O usuário envia `/agente [mensagem]` pelo Telegram.
 
-O bot (Railway) recebe o comando e dispara um evento `repository_dispatch` no GitHub com:
-- `mensagem`: o texto do usuário
-- `chat_id`: o ID do chat Telegram para responder
-
-O GitHub Actions executa `scripts/agente-ia.js`, que:
-1. Conecta ao Firestore e coleta os dados financeiros atuais
-2. Chama a API do Claude com o contexto + mensagem do usuário
-3. Claude decide entre responder diretamente ou usar uma ferramenta (tool)
-4. Após decidir, envia a resposta de volta via Telegram API
+O bot (Render) processa o comando diretamente em `Bot Render/commands/agente.js`:
+1. Constrói o prompt com o contexto do sistema + mensagem do usuário
+2. Envia para a API do **Google Gemini** (`gemini-2.0-flash`) com function calling
+3. O Gemini decide quais ferramentas (funções) chamar para buscar/alterar dados
+4. O bot executa as ferramentas no Firestore usando o Firebase Admin SDK
+5. O Gemini compõe a resposta final e envia de volta ao Telegram
+6. Toda a interação é registrada na coleção `agente_log` no Firestore
 
 ---
 
-## Ferramentas disponíveis (tools em `scripts/agente-ia.js`)
+## Arquitetura
 
-### `registrar_saida`
-Registra uma despesa no Firestore (coleção `banco`).
-```json
-{ "descricao": "cinema", "valor": 42.90 }
 ```
-Resultado: cria documento `{ data, tipo:"Saida", valor, descricao }` em `banco/`.
+Telegram → Bot (Render) → Gemini API → Function Calling → Firestore
+                                    ↑_____________________________|
+                                    (loop até resposta final)
+                                           ↓
+                                      agente_log
+```
 
-### `registrar_entrada`
-Registra uma receita no Firestore (coleção `banco`).
-```json
-{ "descricao": "salário", "valor": 8556 }
-```
-Resultado: cria documento `{ data, tipo:"Entrada", valor, descricao }` em `banco/`.
+**Vantagem sobre a arquitetura anterior (GitHub Actions):**
+- Resposta imediata (sem delay de ~30s do Actions)
+- Sem necessidade de repository_dispatch
+- Tudo roda dentro do próprio bot no Render
 
-### `excluir_lancamento`
-Remove um documento da coleção `banco` pelo ID.
-```json
-{ "id": "abc123xyz" }
-```
+---
+
+## Ferramentas Disponíveis (function calling)
+
+| Ferramenta | Coleção | O que faz |
+|------------|---------|-----------|
+| `consultar_banco` | `banco` | Lê lançamentos, filtrando por mês/ano/tipo |
+| `registrar_lancamento` | `banco` | Cria nova entrada ou saída |
+| `excluir_lancamento` | `banco` | Remove um lançamento pelo ID |
+| `consultar_patrimonio` | `patrimonio` | Lista todos os ativos |
+| `registrar_patrimonio` | `patrimonio` | Adiciona novo ativo |
+| `atualizar_patrimonio` | `patrimonio` | Atualiza valor/nome/plataforma de ativo |
+| `excluir_patrimonio` | `patrimonio` | Remove um ativo |
+| `consultar_distribuicao_mensal` | `distribuicao_mensal` | Lê planejamento do mês |
+| `atualizar_status_distribuicao` | `distribuicao_mensal` | Marca conta como Pago/naoPago |
+| `consultar_contas_casa` | `contas_casa` | Lê contas da casa do mês |
+| `atualizar_conta_casa` | `contas_casa` | Atualiza status/valor/pagante de conta |
+| `consultar_config` | `config` | Lê nomes de colunas configuradas |
 
 ---
 
@@ -60,7 +68,7 @@ Remove um documento da coleção `banco` pelo ID.
 ```
 banco/{id}
   data:      "2026-06-23"      // YYYY-MM-DD
-  tipo:      "Entrada"|"Saida"
+  tipo:      "Entrada" | "Saida"
   valor:     1500.00
   descricao: "Salário"
 
@@ -69,64 +77,120 @@ patrimonio/{id}
   plataforma:  "Mercado Bitcoin"
   valor:       2180.00
 
-distribuicao_mensal/{ano-mes}   // ex: "2026-06"
+distribuicao_mensal/{YYYY-MM}   // ex: "2026-06"
   dataMes:  "06-2026"
   colunas:
-    "HBO":    { valor: 14.00, status: "Pago"|"naoPago" }
-    "Seguro": { valor: 5.99,  status: "Pago"|"naoPago" }
+    "Netflix": { valor: 45.90, status: "Pago" | "naoPago" }
+    "HBO":     { valor: 14.00, status: "Pago" | "naoPago" }
 
-contas_casa/{ano-mes}           // ex: "2026-06"
+contas_casa/{YYYY-MM}           // ex: "2026-06"
   dataMes:  "06-2026"
   colunas:
     "Mercado": { valor: 180.54, status: "Pago", pagante: "Digo" }
     "Luz":     { valor: 120.00, status: "naoPago", pagante: "Bella" }
 
 config/distribuicao_colunas
-  colunas: ["HBO","Netflix",...]
+  colunas: ["Netflix", "HBO", ...]
 
 config/contas_casa_colunas
   colunas:
     "Mercado": { defaultPagante: "Digo" }
     "Luz":     { defaultPagante: "Bella" }
+
+agente_log/{id}                 // registro automático de cada interação
+  timestamp:        "2026-06-28T14:30:00.000Z"
+  data:             "28/06/2026"
+  mensagem_usuario: "registra saída cinema 45 reais"
+  resposta_agente:  "✅ Saída registrada: cinema — R$ 45,00"
+  acoes_realizadas: [
+    { tipo: "ESCRITA", colecao: "banco", id: "abc123", descricao: "Saida: cinema R$ 45" }
+  ]
 ```
 
 ---
 
-## Como alterar o código do Agente
+## Estrutura do App Web (para contexto do agente)
 
-O arquivo principal do agente é `scripts/agente-ia.js`.
+O app web é organizado como uma planilha com as seções:
 
-Para **adicionar uma nova ferramenta**:
-1. Adicione um item ao array `tools` com `name`, `description` e `input_schema`
-2. Adicione o `case` correspondente na função `executarTool(name, input)`
-3. Commit e push — o próximo acionamento via `/agente` já usará a nova tool
+| Seção | Coleção Firestore | Descrição |
+|-------|-------------------|-----------|
+| Dashboard | múltiplas | Resumo geral (não editável) |
+| Banco | `banco` | Todas as entradas e saídas |
+| Distribuição Mensal | `distribuicao_mensal` | Planejamento mensal do salário |
+| Patrimônio | `patrimonio` | Ativos e investimentos |
+| Contas Casa | `contas_casa` | Gastos compartilhados Digo/Bella |
+| Focus | `carro_gastos`, `carro_afazer` | Gastos com Ford Focus |
+| Face | `face_gastos`, `face_afazer` | Gastos com outro carro |
+| Devo/Devem | `devo_devem` | Controle de dívidas |
 
-Para **alterar o prompt do sistema** (comportamento do agente):
-- Edite a variável `systemPrompt` dentro da função `main()`
+> O agente atualmente cobre: Banco, Patrimônio, Distribuição Mensal e Contas Casa.
+> Focus, Face e Devo/Devem não têm ferramentas no agente (pode ser expandido).
 
-Para **testar localmente**:
+---
+
+## Como Alterar o Agente
+
+O arquivo principal é `Bot Render/commands/agente.js`.
+
+**Para adicionar uma nova ferramenta:**
+1. Adicione a declaração no array `FERRAMENTAS` (nome, description, parameters)
+2. Adicione o `case` correspondente na função `executarTool`
+3. Commit e push — o Render faz o redeploy automático
+
+**Para alterar o comportamento/personalidade:**
+- Edite a constante `SYSTEM_PROMPT` no topo do arquivo
+
+**Para trocar o modelo Gemini:**
+- Troque `'gemini-2.0-flash'` por outro modelo (ex: `'gemini-1.5-pro'`)
+
+**Para testar localmente:**
 ```bash
-cd scripts
-MENSAGEM="qual é meu saldo?" CHAT_ID="123" ANTHROPIC_API_KEY="..." FIREBASE_SERVICE_ACCOUNT="..." TELEGRAM_BOT_TOKEN="..." node agente-ia.js
+cd "Bot Render"
+GEMINI_API_KEY="sua_key" TELEGRAM_BOT_TOKEN="..." FIREBASE_SERVICE_ACCOUNT="..." node index.js
+# Então envie /agente [mensagem] no Telegram
 ```
+
+---
+
+## Log de Interações (`agente_log`)
+
+Cada interação do agente gera automaticamente um documento em `agente_log` com:
+- Timestamp da interação
+- Mensagem original do usuário
+- Resposta do agente
+- Lista de todas as ações realizadas no BD (leituras, escritas e exclusões)
+
+Isso garante rastreabilidade completa de tudo que o agente fez.
+
+---
+
+## Variável de Ambiente Necessária
+
+| Variável | Onde obter |
+|----------|-----------|
+| `GEMINI_API_KEY` | [Google AI Studio](https://aistudio.google.com/app/apikey) — gratuito |
+
+Adicionar no painel do Render: **Environment Variables → Add Variable**.
 
 ---
 
 ## Comandos Telegram
 
-| Comando | O que faz | Código responsável |
-|---------|-----------|-------------------|
-| `/saida [desc] [valor]`   | Registra saída no Firestore  | `Bot Railway/commands/saida.js` |
-| `/entrada [desc] [valor]` | Registra entrada no Firestore| `Bot Railway/commands/entrada.js` |
-| `/saldo`                  | Calcula e exibe saldo atual  | `Bot Railway/commands/saldo.js` |
-| `/agente [mensagem]`      | Aciona o Agente IA via GitHub Actions | `Bot Railway/commands/agente.js` + `scripts/agente-ia.js` |
+| Comando | O que faz | Código |
+|---------|-----------|--------|
+| `/agente [msg]` | Aciona o Agente IA com Gemini | `Bot Render/commands/agente.js` |
+| `/saida [desc] [valor]` | Registra saída direta | `Bot Render/commands/saida.js` |
+| `/entrada [desc] [valor]` | Registra entrada direta | `Bot Render/commands/entrada.js` |
+| `/saldo` | Saldo atual | `Bot Render/commands/saldo.js` |
 
 ---
 
-## Comportamento esperado
+## Comportamento Esperado
 
-- Seja direto e objetivo nas respostas
-- Use formatação Markdown compatível com Telegram (`*negrito*`, `_itálico_`)
-- Sempre confirme ações realizadas ("Saída registrada: cinema — R$ 42,90")
-- Se não tiver certeza do que o usuário quer, pergunte antes de agir
-- Para exclusões, se o usuário não fornecer o ID, informe que não é possível excluir sem o ID e oriente a usar o app web
+- Respostas diretas e objetivas em português
+- Formatação Markdown compatível com Telegram (`*negrito*`, `_itálico_`)
+- Sempre confirma ações realizadas com emoji de sucesso
+- Pergunta antes de agir quando há ambiguidade
+- Para exclusões sem ID, consulta primeiro e pede confirmação
+- Ao final de alterações, lista o que foi feito no BD
