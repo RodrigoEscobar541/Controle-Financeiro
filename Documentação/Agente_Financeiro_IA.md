@@ -19,7 +19,7 @@ O usuário envia `/agente [mensagem]` pelo Telegram.
 
 O bot (Render) processa o comando diretamente em `Bot Render/commands/agente.js`:
 1. Constrói o prompt com o contexto do sistema + mensagem do usuário
-2. Envia para a API do **Google Gemini** (`gemini-2.0-flash`) com function calling
+2. Envia para a API do **Google Gemini** (`gemini-1.5-flash`) com function calling
 3. O Gemini decide quais ferramentas (funções) chamar para buscar/alterar dados
 4. O bot executa as ferramentas no Firestore usando o Firebase Admin SDK
 5. O Gemini compõe a resposta final e envia de volta ao Telegram
@@ -142,7 +142,7 @@ O arquivo principal é `Bot Render/commands/agente.js`.
 - Edite a constante `SYSTEM_PROMPT` no topo do arquivo
 
 **Para trocar o modelo Gemini:**
-- Troque `'gemini-2.0-flash'` por outro modelo (ex: `'gemini-1.5-pro'`)
+- Troque `'gemini-1.5-flash'` por outro modelo (ex: `'gemini-1.5-pro'`)
 
 **Para testar localmente:**
 ```bash
