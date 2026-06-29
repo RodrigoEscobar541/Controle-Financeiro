@@ -221,6 +221,31 @@ const FERRAMENTAS = [
     parameters: { type: 'object', properties: {}, required: [] }
   },
   {
+    name: 'criar_coluna_contas_casa',
+    description: 'Cria uma nova coluna (conta) permanente em Contas da Casa. Adiciona ao config e a todos os meses presentes e futuros.',
+    parameters: {
+      type: 'object',
+      properties: {
+        nome:    { type: 'string', description: 'Nome da nova conta (ex: "Mercado Isa", "Internet").' },
+        valor:   { type: 'number', description: 'Valor padrão mensal em reais.' },
+        pagante: { type: 'string', description: '"Digo" ou "Bella". Quem normalmente paga essa conta. Padrão: "Digo".' }
+      },
+      required: ['nome', 'valor']
+    }
+  },
+  {
+    name: 'criar_coluna_distribuicao',
+    description: 'Cria uma nova coluna (despesa fixa) permanente na Distribuição Mensal. Adiciona ao config e a todos os meses presentes e futuros.',
+    parameters: {
+      type: 'object',
+      properties: {
+        nome:  { type: 'string', description: 'Nome da nova coluna (ex: "Disney+", "Seguro carro").' },
+        valor: { type: 'number', description: 'Valor mensal em reais.' }
+      },
+      required: ['nome', 'valor']
+    }
+  },
+  {
     name: 'consultar_carro',
     description: 'Consulta gastos feitos e lista de serviços a fazer de um dos carros (Focus ou Face).',
     parameters: {
@@ -466,6 +491,74 @@ async function executarTool(nome, args, db, acoesLog) {
         const ref      = await db.collection(colecao).add({ prioridade: maxPrio + 1, descricao: args.descricao, valor: args.valor });
         acoesLog.push({ tipo: 'ESCRITA', colecao, id: ref.id, descricao: `A fazer ${args.carro}: "${args.descricao}" R$ ${args.valor}` });
         return { sucesso: true, id: ref.id, prioridade: maxPrio + 1 };
+      }
+
+      case 'criar_coluna_contas_casa': {
+        const pagante    = args.pagante || 'Digo';
+        const configRef  = db.collection('config').doc('contas_casa_colunas');
+        const configSnap = await configRef.get();
+        const dataConf   = configSnap.exists ? configSnap.data() : {};
+        const colunasConfig = dataConf.colunas || {};
+        const ordemAtual    = Array.isArray(dataConf.ordem) ? dataConf.ordem : [];
+
+        if (colunasConfig[args.nome]) {
+          return { sucesso: false, erro: `A conta "${args.nome}" já existe em Contas da Casa.` };
+        }
+
+        await configRef.set({
+          colunas: { ...colunasConfig, [args.nome]: { defaultPagante: pagante } },
+          ordem:   [...ordemAtual, args.nome]
+        });
+
+        const mesAtualId = anoMes;
+        const mesesSnap  = await db.collection('contas_casa').get();
+        const batch      = db.batch();
+        let atualizados  = 0;
+
+        for (const mesDoc of mesesSnap.docs) {
+          if (mesDoc.id >= mesAtualId) {
+            const cols = mesDoc.data().colunas || {};
+            if (!cols[args.nome]) {
+              batch.update(mesDoc.ref, { [`colunas.${args.nome}`]: { valor: args.valor, status: 'naoPago', pagante } });
+              atualizados++;
+            }
+          }
+        }
+        if (atualizados > 0) await batch.commit();
+
+        acoesLog.push({ tipo: 'ESCRITA', colecao: 'config + contas_casa', descricao: `Criou coluna "${args.nome}" (${pagante}) em ${atualizados} mês(es)` });
+        return { sucesso: true, mensagem: `Coluna "${args.nome}" criada em ${atualizados} mês(es)`, pagante };
+      }
+
+      case 'criar_coluna_distribuicao': {
+        const configRef  = db.collection('config').doc('distribuicao_colunas');
+        const configSnap = await configRef.get();
+        const colunasAtual = configSnap.exists ? (configSnap.data().colunas || []) : [];
+
+        if (colunasAtual.includes(args.nome)) {
+          return { sucesso: false, erro: `A coluna "${args.nome}" já existe na Distribuição Mensal.` };
+        }
+
+        await configRef.set({ colunas: [...colunasAtual, args.nome] }, { merge: true });
+
+        const mesAtualId = anoMes;
+        const mesesSnap  = await db.collection('distribuicao_mensal').get();
+        const batch      = db.batch();
+        let atualizados  = 0;
+
+        for (const mesDoc of mesesSnap.docs) {
+          if (mesDoc.id >= mesAtualId) {
+            const cols = mesDoc.data().colunas || {};
+            if (!cols[args.nome]) {
+              batch.update(mesDoc.ref, { [`colunas.${args.nome}`]: { valor: args.valor, status: 'naoPago' } });
+              atualizados++;
+            }
+          }
+        }
+        if (atualizados > 0) await batch.commit();
+
+        acoesLog.push({ tipo: 'ESCRITA', colecao: 'config + distribuicao_mensal', descricao: `Criou coluna "${args.nome}" em ${atualizados} mês(es)` });
+        return { sucesso: true, mensagem: `Coluna "${args.nome}" criada em ${atualizados} mês(es)` };
       }
 
       case 'excluir_item_carro': {
