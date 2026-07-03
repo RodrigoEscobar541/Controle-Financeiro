@@ -57,6 +57,9 @@ O app é organizado como uma planilha com as seguintes seções:
 - Focus: gastos com o Ford Focus — coleções carro_feitos (gastos feitos), carro_afazer (lista de serviços pendentes) e carro_abastecimento (registro de combustível)
 - Face: gastos com o Ecosport/Face — coleções focus_feitos (gastos feitos), focus_afazer (lista de serviços pendentes) e focus_abastecimento (registro de combustível)
 - Devo/Devem: controle de dívidas (não coberto pelas suas ferramentas)
+- No menu, o usuário pode criar novas sections (botão "+ Nova Section") a partir de 5 templates —
+  Banco, Tabela Distribuição, Patrimônio, Novo Carro e Devo/Devem — e também "excluir" (ocultar) qualquer
+  section, fixa ou customizada. Você também pode fazer isso pelas ferramentas criar_secao e excluir_secao.
 
 7. COLEÇÃO: carro_feitos/{id}  — gastos já realizados no Focus
    Campos: data (YYYY-MM-DD), descricao (string), valor (número)
@@ -73,12 +76,24 @@ O app é organizado como uma planilha com as seguintes seções:
 11. COLEÇÃO: carro_abastecimento/{id} — abastecimentos do Focus | focus_abastecimento/{id} — abastecimentos do Face
     Campos: data (YYYY-MM-DD), km (número, km rodado NESTE tanque, não é odômetro acumulado),
     correcao (número 0-100, % a descontar do km informado), litros (número),
-    valorPago (número ou null, opcional), tipoCombustivel (string, ex: "Gasolina")
-    → km efetivo = km * (1 - correcao/100); km/L = km efetivo / litros; R$/km = valorPago / km efetivo (se houver valorPago)
+    valorPago (número ou null, opcional — preço pago POR LITRO, não o total), tipoCombustivel (string, ex: "Gasolina")
+    → km efetivo = km * (1 - correcao/100); km/L = km efetivo / litros; R$/km = (valorPago * litros) / km efetivo (se houver valorPago)
     → Use para: registrar um abastecimento e para calcular/informar consumo (km/L) e custo por km de cada carro
 
 12. COLEÇÃO: combustivel_tipos/{id} — tipos de combustível cadastrados (compartilhada entre Focus e Face)
     Campos: nome (string). Já vem com Gasolina, Etanol e Diesel; o usuário pode ter cadastrado outros (ex: GNV)
+
+13. COLEÇÃO: secoes_customizadas/{id} — sections criadas pelo usuário (pelo app ou por você) a partir de um
+    template, iguais em funcionamento a uma section fixa só que com nome e coleções próprias.
+    Campos: nome, slug, template ("banco"|"distribuicao"|"patrimonio"|"carro"|"devo-devem"),
+    icone, colecoes (nomes das coleções geradas a partir do slug), criadoEm, origem ("web"|"agente"),
+    ativo (bool), excluidoEm
+    → Excluir NUNCA apaga dados: só marca ativo=false (soft delete) — o histórico continua no Firestore
+    → Use para: criar novas sections (ex: "Moto", "Cartão Nubank") e para "excluir" (ocultar) sections
+
+14. DOCUMENTO: config/secoes_ocultas — Campos: nomes (array com as chaves das sections FIXAS que o
+    usuário ocultou: "banco", "distribuicao", "patrimonio", "contas-casa", "carro", "face", "devo-devem")
+    → "Dashboard" nunca pode ser ocultado
 
 REGRAS DE COMPORTAMENTO:
 - Seja direto e objetivo
@@ -91,6 +106,10 @@ REGRAS DE COMPORTAMENTO:
 - Para excluir um lançamento sem ID, consulte primeiro para encontrar o item e mostre ao usuário para confirmar
 - Ao responder sobre valores, sempre formate em R$ (ex: R$ 1.500,00)
 - Ao final de cada resposta, se realizou alguma alteração no BD, liste resumidamente o que foi feito
+- Antes de chamar criar_secao, confirme com o usuário o nome e qual dos 5 templates ele quer
+  ("banco", "distribuicao", "patrimonio", "carro" ou "devo-devem") — a section vai nascer vazia (zerada)
+- Antes de chamar excluir_secao, sempre confirme o nome exato com o usuário — a ação some com a section do
+  app (menu e dashboard), mesmo não apagando nenhum dado
 - Data atual: ${new Date().toLocaleDateString('pt-BR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}`;
 
 // ─── Declarações de ferramentas ───────────────────────────────────────────────
@@ -320,7 +339,7 @@ const FERRAMENTAS = [
         litros:          { type: 'number', description: 'Litros abastecidos.' },
         tipoCombustivel: { type: 'string', description: 'Nome do tipo de combustível (ex: "Gasolina", "Etanol", "Diesel"). Se não existir na lista, será cadastrado automaticamente.' },
         correcao:        { type: 'number', description: 'Percentual (0-100) a descontar do km informado, ex: se o painel/GPS costuma superestimar. Opcional, padrão 0.' },
-        valorPago:       { type: 'number', description: 'Valor pago em reais. Opcional.' },
+        valorPago:       { type: 'number', description: 'Preço pago por litro do combustível, em reais (não é o valor total do abastecimento). Opcional.' },
         data:            { type: 'string', description: 'Data no formato YYYY-MM-DD. Se omitido, usa hoje.' }
       },
       required: ['carro', 'km', 'litros', 'tipoCombustivel']
@@ -337,8 +356,61 @@ const FERRAMENTAS = [
       },
       required: ['carro']
     }
+  },
+  {
+    name: 'listar_secoes',
+    description: 'Lista as sections do app: quais sections fixas estão ocultas e quais sections customizadas existem (ativas e excluídas/arquivadas). Use antes de criar_secao para conferir nomes já usados, e antes de excluir_secao para achar o nome/id certo.',
+    parameters: { type: 'object', properties: {}, required: [] }
+  },
+  {
+    name: 'criar_secao',
+    description: 'Cria uma nova section no app a partir de um template, com nome escolhido pelo usuário. A section nasce vazia (zerada) e passa a aparecer no menu lateral e no dashboard, com coleções próprias no Firestore nomeadas a partir do nome escolhido.',
+    parameters: {
+      type: 'object',
+      properties: {
+        nome:     { type: 'string', description: 'Nome de exibição da nova section (ex: "Moto", "Cartão Nubank"). Também define o nome das coleções no banco.' },
+        template: { type: 'string', description: 'Um de: "banco" (extrato de entradas/saídas), "distribuicao" (planilha mensal com colunas dinâmicas), "patrimonio" (lista de ativos), "carro" (A Fazer/Feitos/Abastecimento/Manutenção) ou "devo-devem" (controle de dívidas parceladas).' }
+      },
+      required: ['nome', 'template']
+    }
+  },
+  {
+    name: 'excluir_secao',
+    description: 'Exclui (oculta) uma section do menu e do dashboard pelo nome exato. NUNCA apaga dados: sections fixas só entram numa lista de ocultas; sections customizadas só ficam marcadas como inativas — o histórico continua no Firestore. Sempre confirme o nome exato com o usuário antes de chamar.',
+    parameters: {
+      type: 'object',
+      properties: {
+        nome: { type: 'string', description: 'Nome exato da section a excluir, como aparece no menu (ex: "Focus", "Banco", "Moto").' }
+      },
+      required: ['nome']
+    }
   }
 ];
+
+// ─── Templates de section (mesma lógica de public/js/section-templates.js) ────
+
+const SECOES_FIXAS_LABELS = {
+  banco: 'Banco', distribuicao: 'Distribuição', patrimonio: 'Patrimônio',
+  'contas-casa': 'Contas Casa', carro: 'Focus', face: 'Face', 'devo-devem': 'Devo / Devem'
+};
+const SECOES_FIXAS_KEYS = Object.keys(SECOES_FIXAS_LABELS);
+
+const TEMPLATES_SECAO = {
+  banco:        { icone: '💳', buildColecoes: slug => ({ principal: slug }) },
+  distribuicao: { icone: '📅', buildColecoes: slug => ({ mensal: `${slug}_mensal`, colunasConfig: `${slug}_colunas` }) },
+  patrimonio:   { icone: '💎', buildColecoes: slug => ({ principal: slug }) },
+  carro:        { icone: '🚗', buildColecoes: slug => ({ afazer: `${slug}_afazer`, feitos: `${slug}_feitos`, manutencao: `${slug}_manutencao`, abastecimento: `${slug}_abastecimento` }) },
+  'devo-devem': { icone: '💸', buildColecoes: slug => ({ principal: slug }) }
+};
+
+function slugifySecao(nome) {
+  return String(nome || '')
+    .normalize('NFD').replace(/[̀-ͯ]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '')
+    .slice(0, 40);
+}
 
 // ─── Executor de ferramentas ──────────────────────────────────────────────────
 
@@ -634,11 +706,11 @@ async function executarTool(nome, args, db, acoesLog) {
 
         const kmEfetivo  = args.km * (1 - correcao / 100);
         const kmPorLitro = args.litros > 0 ? kmEfetivo / args.litros : null;
-        const rsPorKm    = (valorPago && kmEfetivo > 0) ? valorPago / kmEfetivo : null;
+        const rsPorKm    = (valorPago && kmEfetivo > 0) ? (valorPago * args.litros) / kmEfetivo : null;
 
         acoesLog.push({
           tipo: 'ESCRITA', colecao, id: ref.id,
-          descricao: `Abastecimento ${args.carro}: ${args.km}km, ${args.litros}L, ${nomeTipo}${valorPago ? `, R$ ${valorPago}` : ''}`
+          descricao: `Abastecimento ${args.carro}: ${args.km}km, ${args.litros}L, ${nomeTipo}${valorPago ? `, R$ ${valorPago}/L` : ''}`
         });
         return { sucesso: true, id: ref.id, km_efetivo: kmEfetivo, km_por_litro: kmPorLitro, rs_por_km: rsPorKm };
       }
@@ -658,7 +730,7 @@ async function executarTool(nome, args, db, acoesLog) {
             ...item,
             km_efetivo:  kmEfetivo,
             km_por_litro: litros > 0 ? kmEfetivo / litros : null,
-            rs_por_km:    (item.valorPago && kmEfetivo > 0) ? item.valorPago / kmEfetivo : null
+            rs_por_km:    (item.valorPago && kmEfetivo > 0) ? (item.valorPago * litros) / kmEfetivo : null
           };
         });
 
@@ -669,6 +741,87 @@ async function executarTool(nome, args, db, acoesLog) {
 
         acoesLog.push({ tipo: 'LEITURA', colecao, descricao: `Consultou ${registros.length} abastecimentos (${args.carro})` });
         return { sucesso: true, carro: isFocus ? 'Focus' : 'Face', registros, media_km_por_litro: mediaKmPorLitro };
+      }
+
+      case 'listar_secoes': {
+        const [ocultasSnap, customsSnap] = await Promise.all([
+          db.collection('config').doc('secoes_ocultas').get(),
+          db.collection('secoes_customizadas').get()
+        ]);
+        const ocultas      = ocultasSnap.exists ? (ocultasSnap.data().nomes || []) : [];
+        const customizadas = customsSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+
+        acoesLog.push({ tipo: 'LEITURA', colecao: 'secoes_customizadas + config', descricao: 'Consultou sections existentes' });
+        return {
+          sucesso: true,
+          sections_fixas_ocultas: ocultas,
+          sections_fixas_disponiveis: SECOES_FIXAS_KEYS.filter(k => !ocultas.includes(k)).map(k => SECOES_FIXAS_LABELS[k]),
+          sections_customizadas: customizadas
+        };
+      }
+
+      case 'criar_secao': {
+        const template = String(args.template || '').trim();
+        const tpl = TEMPLATES_SECAO[template];
+        if (!tpl) return { sucesso: false, erro: `Template "${args.template}" inválido. Use: banco, distribuicao, patrimonio, carro ou devo-devem.` };
+
+        const nomeTrim = String(args.nome || '').trim();
+        if (!nomeTrim) return { sucesso: false, erro: 'Informe um nome para a section.' };
+        if (nomeTrim.length > 40) return { sucesso: false, erro: 'Nome muito longo (máx. 40 caracteres).' };
+
+        const slug = slugifySecao(nomeTrim);
+        if (!slug) return { sucesso: false, erro: 'Nome inválido — use letras ou números.' };
+        if (SECOES_FIXAS_KEYS.includes(slug)) {
+          return { sucesso: false, erro: 'Já existe uma section fixa com esse nome. Escolha outro nome.' };
+        }
+        const conflito = await db.collection('secoes_customizadas').where('slug', '==', slug).get();
+        if (!conflito.empty) {
+          return { sucesso: false, erro: `Já existe uma section chamada "${nomeTrim}" (ou muito parecida). Escolha outro nome.` };
+        }
+
+        const payload = {
+          nome: nomeTrim,
+          slug,
+          template,
+          icone: tpl.icone,
+          colecoes: tpl.buildColecoes(slug),
+          criadoEm: new Date().toISOString(),
+          origem: 'agente',
+          ativo: true,
+          excluidoEm: null
+        };
+        const ref = await db.collection('secoes_customizadas').add(payload);
+
+        acoesLog.push({ tipo: 'ESCRITA', colecao: 'secoes_customizadas', id: ref.id, descricao: `Criou a section "${nomeTrim}" (template ${template})` });
+        return { sucesso: true, id: ref.id, secao: { id: ref.id, ...payload }, mensagem: `Section "${nomeTrim}" criada — abra o app para vê-la no menu e no dashboard.` };
+      }
+
+      case 'excluir_secao': {
+        const nomeBuscado = String(args.nome || '').trim().toLowerCase();
+        if (!nomeBuscado) return { sucesso: false, erro: 'Informe o nome exato da section a excluir.' };
+
+        const fixaKey = SECOES_FIXAS_KEYS.find(k => SECOES_FIXAS_LABELS[k].toLowerCase() === nomeBuscado);
+
+        if (fixaKey) {
+          const ocultasRef  = db.collection('config').doc('secoes_ocultas');
+          const ocultasSnap = await ocultasRef.get();
+          const atuais = ocultasSnap.exists ? (ocultasSnap.data().nomes || []) : [];
+          if (atuais.includes(fixaKey)) {
+            return { sucesso: false, erro: `A section "${SECOES_FIXAS_LABELS[fixaKey]}" já está oculta.` };
+          }
+          await ocultasRef.set({ nomes: [...atuais, fixaKey] }, { merge: true });
+          acoesLog.push({ tipo: 'ESCRITA', colecao: 'config/secoes_ocultas', descricao: `Ocultou a section fixa "${SECOES_FIXAS_LABELS[fixaKey]}"` });
+          return { sucesso: true, mensagem: `Section "${SECOES_FIXAS_LABELS[fixaKey]}" ocultada do menu e do dashboard. Nenhum dado foi apagado.` };
+        }
+
+        const customsSnap = await db.collection('secoes_customizadas').where('ativo', '==', true).get();
+        const alvo = customsSnap.docs.find(d => (d.data().nome || '').trim().toLowerCase() === nomeBuscado);
+        if (!alvo) {
+          return { sucesso: false, erro: `Nenhuma section ativa chamada "${args.nome}" foi encontrada. Use listar_secoes para conferir os nomes.` };
+        }
+        await alvo.ref.update({ ativo: false, excluidoEm: new Date().toISOString() });
+        acoesLog.push({ tipo: 'ESCRITA', colecao: 'secoes_customizadas', id: alvo.id, descricao: `Excluiu (arquivou) a section "${alvo.data().nome}"` });
+        return { sucesso: true, mensagem: `Section "${alvo.data().nome}" excluída do menu e do dashboard. O histórico continua no Firestore.` };
       }
 
       default:
@@ -695,8 +848,10 @@ module.exports = async (ctx, db) => {
       '• /agente quanto tenho de patrimônio?\n' +
       '• /agente marca Netflix como pago em junho\n' +
       '• /agente qual o total das contas da casa esse mês?\n' +
-      '• /agente registra abastecimento do focus, 350km, 30 litros de gasolina, paguei 180 reais\n' +
-      '• /agente qual o consumo médio do face?',
+      '• /agente registra abastecimento do focus, 350km, 30 litros de gasolina, paguei 6,19 por litro\n' +
+      '• /agente qual o consumo médio do face?\n' +
+      '• /agente cria uma section nova chamada Moto usando o template de carro\n' +
+      '• /agente exclui a section Moto',
       { parse_mode: 'Markdown' }
     );
   }

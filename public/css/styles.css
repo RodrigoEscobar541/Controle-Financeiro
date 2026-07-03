@@ -128,6 +128,15 @@ input, select, textarea { font-family: inherit; font-size: inherit; }
   background: #fff;
 }
 
+.form-hint {
+  display: block;
+  margin-top: 0.35rem;
+  color: var(--text-secondary);
+  font-size: 0.75rem;
+  text-transform: none;
+  letter-spacing: normal;
+}
+
 .form-inline {
   display: flex;
   flex-wrap: wrap;
@@ -333,6 +342,38 @@ input, select, textarea { font-family: inherit; font-size: inherit; }
 }
 
 .nav-icon { font-size: 1.125rem; width: 1.5rem; text-align: center; }
+
+.sidebar-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  padding: 0.5rem 1rem 1rem;
+}
+
+.btn-sidebar-action {
+  width: 100%;
+  text-align: left;
+  padding: 0.55rem 0.75rem;
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 8px;
+  background: transparent;
+  color: #A0AEC0;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  transition: all 0.15s;
+}
+
+.btn-sidebar-primary:hover {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: #fff;
+}
+
+.btn-sidebar-danger:hover {
+  background: var(--danger-light);
+  border-color: var(--danger);
+  color: var(--danger);
+}
 
 .sidebar-footer {
   padding: 1rem;

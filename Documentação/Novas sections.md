@@ -116,13 +116,13 @@ Etanol, Diesel) na primeira vez que estiver vazia.
   km:               350,           // km rodado NESTE tanque (não é odômetro acumulado)
   correcao:         10,            // % a descontar do km informado (0 = sem correção)
   litros:           30,
-  valorPago:        180.00,        // opcional (null se não informado)
+  valorPago:        6.19,          // preço pago POR LITRO (não o total do abastecimento), opcional (null se não informado)
   tipoCombustivel:  "Gasolina"     // string solta, denormalizada de combustivel_tipos
 }
 ```
 
 `kmEfetivo = km * (1 - correcao/100)` é calculado no front, não persistido.
-A partir dele: `km/L = kmEfetivo / litros` e `R$/km = valorPago / kmEfetivo` (se houver valorPago).
+A partir dele: `km/L = kmEfetivo / litros` e `R$/km = (valorPago * litros) / kmEfetivo` (se houver valorPago).
 
 #### Coleção: `combustivel_tipos`
 
@@ -135,7 +135,7 @@ A partir dele: `km/L = kmEfetivo / litros` e `R$/km = valorPago / kmEfetivo` (se
 ### Estrutura Visual
 
 Card "⛽ Abastecimento", com botão "⚙️ Tipos" (abre modal de gerenciar tipos) e
-"+ Registrar". Tabela: `Data | KM (com correção) | Litros | Combustível | Valor pago | km/L | R$/km | Ações`.
+"+ Registrar". Tabela: `Data | KM (com correção) | Litros | Combustível | Valor/L | km/L | R$/km | Ações`.
 
 - Por padrão mostra só o registro mais recente; botão "Carregar mais" soma 5 por clique
   (mesmo mecanismo do bloco Feitos).
@@ -143,7 +143,7 @@ Card "⛽ Abastecimento", com botão "⚙️ Tipos" (abre modal de gerenciar tip
 - No formulário de registro, o select de tipo tem uma opção "+ Novo tipo..." que
   revela um campo de texto — ao salvar, cria o tipo em `combustivel_tipos` antes de
   gravar o abastecimento.
-- "Valor pago" é opcional; o último valor digitado fica em `localStorage`
+- "Valor pago por litro" é opcional; o último valor digitado fica em `localStorage`
   (`tf_valorPago_carro` / `tf_valorPago_focus`) só para pré-preencher o campo na
   próxima abertura do formulário — o valor em si sempre é salvo no Firestore.
 
@@ -251,3 +251,85 @@ A section é dividida em 2 tabelas lado a lado (ou empilhadas no mobile):
 | `public/app.html` | Adicionar `<a data-section="devo-devem">` no nav + `<section id="section-devo-devem">` |
 | `public/js/app.js` | Adicionar `import { initDevoDeve }` e chamada no switch de sections |
 | `Querys/dividas-queries.js` | Criar — queries para o bot Telegram (opcional, fase 2) |
+
+---
+
+## Feature: "+ Nova Section" (sections dinâmicas/customizadas)
+
+### Visão Geral
+
+Botão no menu lateral que permite criar novas sections em tempo real, sem alterar
+código, a partir de 5 templates — réplicas fiéis (porém vazias/zeradas) das
+sections fixas: **Banco**, **Tabela Distribuição**, **Patrimônio**, **Novo Carro**
+e **Devo/Devem**. O nome escolhido pelo usuário vira o `slug` que nomeia as
+coleções no Firestore.
+
+Também é possível **excluir qualquer section** (fixa ou customizada) pelo menu —
+a exclusão nunca apaga dados: só oculta a section do menu/dashboard, exigindo que
+o usuário digite o nome exato para confirmar. O `/agente` do bot Telegram tem as
+mesmas capacidades via as ferramentas `criar_secao`, `excluir_secao` e
+`listar_secoes`.
+
+**Botões:** `#btn-nova-secao` / `#btn-excluir-secao` (sidebar, abaixo do `.nav-list`)
+
+---
+
+### Banco de Dados Firestore
+
+#### Coleção: `secoes_customizadas`
+Uma section criada pelo usuário (ou pelo agente) a partir de um template.
+
+```
+{id_aleatorio}: {
+  nome:       "Moto",                          // nome de exibição, escolhido pelo usuário
+  slug:       "moto",                          // gerado a partir do nome — nomeia as coleções
+  template:   "banco"|"distribuicao"|"patrimonio"|"carro"|"devo-devem",
+  icone:      "🚗",
+  colecoes:   { ... },                         // nomes de coleção, montados a partir do slug
+  criadoEm:   "2026-07-03T...",                // ISO string
+  origem:     "web"|"agente",
+  ativo:      true,
+  excluidoEm: null                             // ISO string quando excluída (soft delete)
+}
+```
+
+Mapeamento de `colecoes` por template (a partir do `slug`):
+- `banco` / `patrimonio` / `devo-devem` → `{ principal: slug }`
+- `distribuicao` → `{ mensal: "{slug}_mensal", colunasConfig: "{slug}_colunas" }`
+- `carro` → `{ afazer, feitos, manutencao, abastecimento }: "{slug}_afazer"` etc.
+  (compartilha a coleção global `combustivel_tipos` com Focus/Face)
+
+#### Documento: `config/secoes_ocultas`
+Sections **fixas** ocultadas pelo usuário (nunca inclui `"dashboard"`).
+
+```
+{ nomes: ["carro", "banco"] }
+```
+
+---
+
+### Estrutura Visual
+
+- **Nova Section:** modal com `<select>` de template (mostra descrição ao trocar) +
+  campo de nome. Ao confirmar, a section aparece na hora no menu, ganha um card no
+  dashboard e o usuário é levado direto para ela (já vazia, pronta para uso).
+- **Excluir Section:** modal com `<select>` de todas as sections visíveis (exceto
+  Dashboard) + campo "digite o nome exato para confirmar" (nome atualizado
+  dinamicamente ao trocar a seleção).
+- Cada template customizado é uma réplica genérica do original (`public/js/custom-sections.js`),
+  incluindo o bloco de Anotações (`notas/custom-{slug}`), parametrizada só pelas
+  coleções do Firestore — nenhum HTML novo precisa ser escrito por section.
+
+---
+
+### Arquivos Criados/Alterados
+
+| Arquivo | Alteração |
+|---------|-----------|
+| `public/js/section-templates.js` | Criado — registro dos 5 templates, `slugify`, CRUD de `secoes_customizadas` e `config/secoes_ocultas` |
+| `public/js/custom-sections.js` | Criado — renderização genérica dos 5 templates + `metricaSecao` para o card do dashboard |
+| `public/js/app.js` | Botões Nova/Excluir Section, nav + `<section>` dinâmicos, `activateSection` estendido para `custom-{slug}`, ocultação de sections fixas no boot |
+| `public/js/dashboard.js` | Card por section customizada ativa (`adicionarCardSecaoCustomizada`/`removerCardSecaoCustomizada`) |
+| `public/app.html` | `data-dash-section` nos cards fixos do dashboard (para ocultar), `id="dashboard-grid"`, botões `#btn-nova-secao`/`#btn-excluir-secao` |
+| `public/css/styles.css` | `.sidebar-actions`, `.btn-sidebar-action`, `.form-hint` |
+| `Bot Render/commands/agente.js` | Ferramentas `criar_secao`, `excluir_secao`, `listar_secoes` (mesma lógica de templates/slug do front) |

@@ -5,7 +5,7 @@
  * carro_afazer    { prioridade: Number, descricao: String, valor: Number }
  * carro_feitos    { data: "YYYY-MM-DD", descricao: String, valor: Number }
  * carro_manutencao { descricao: String, data: "YYYY-MM-DD", kmUltimaTroca: String, kmProximaTroca: String, valor: Number }
- * carro_abastecimento { data: "YYYY-MM-DD", km: Number, correcao: Number, litros: Number, valorPago: Number|null, tipoCombustivel: String }
+ * carro_abastecimento { data: "YYYY-MM-DD", km: Number, correcao: Number, litros: Number, valorPago: Number|null (preço por litro, não o total), tipoCombustivel: String }
  */
 
 async function getAfazer(db) {

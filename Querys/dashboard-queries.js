@@ -60,7 +60,7 @@ async function getConsumoCarro(db, colecao, limite = 100) {
     const kmEfetivo = (parseFloat(item.km) || 0) * (1 - correcao / 100);
     const litros    = parseFloat(item.litros) || 0;
     if (litros > 0 && kmEfetivo > 0)     kmLValores.push(kmEfetivo / litros);
-    if (item.valorPago && kmEfetivo > 0) rsKmValores.push(parseFloat(item.valorPago) / kmEfetivo);
+    if (item.valorPago && kmEfetivo > 0) rsKmValores.push((parseFloat(item.valorPago) * litros) / kmEfetivo);
   });
 
   return {

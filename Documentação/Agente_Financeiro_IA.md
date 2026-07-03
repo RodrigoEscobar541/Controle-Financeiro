@@ -120,7 +120,7 @@ carro_abastecimento/{id} | focus_abastecimento/{id}   // abastecimentos do Focus
   km:               350            // km rodado NESTE tanque, não é odômetro acumulado
   correcao:         10             // % a descontar do km informado
   litros:           30
-  valorPago:        180.00         // opcional, pode ser null
+  valorPago:        6.19           // preço por litro (não o total), opcional, pode ser null
   tipoCombustivel:  "Gasolina"
 
 combustivel_tipos/{id}            // compartilhada entre Focus e Face

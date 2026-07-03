@@ -5,7 +5,7 @@
  * focus_afazer    { prioridade: Number, descricao: String, valor: Number }
  * focus_feitos    { data: "YYYY-MM-DD", descricao: String, valor: Number }
  * focus_manutencao { descricao: String, data: "YYYY-MM-DD", kmUltimaTroca: String, kmProximaTroca: String, valor: Number }
- * focus_abastecimento { data: "YYYY-MM-DD", km: Number, correcao: Number, litros: Number, valorPago: Number|null, tipoCombustivel: String }
+ * focus_abastecimento { data: "YYYY-MM-DD", km: Number, correcao: Number, litros: Number, valorPago: Number|null (preço por litro, não o total), tipoCombustivel: String }
  */
 
 async function getAfazer(db) {

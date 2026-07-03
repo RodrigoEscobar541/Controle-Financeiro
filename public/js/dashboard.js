@@ -1,5 +1,7 @@
 import { db } from './firebase-config.js';
 import { fmtBRL, fmtDate, mesAtualId, idToLabel, mesAtualLabel } from './app.js';
+import { carregarSecoesCustomizadas } from './section-templates.js';
+import { metricaSecao } from './custom-sections.js';
 import {
   collection, query, orderBy, where, limit, getDocs, doc, getDoc
 } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
@@ -15,8 +17,81 @@ export async function initDashboard() {
     carregarTotalInvestimentos(),
     carregarDevoDeve(),
     carregarConsumoCarro('carro_abastecimento', 'dash-focus-kml', 'dash-focus-rskm'),
-    carregarConsumoCarro('focus_abastecimento', 'dash-face-kml', 'dash-face-rskm')
+    carregarConsumoCarro('focus_abastecimento', 'dash-face-kml', 'dash-face-rskm'),
+    renderCardsSecoesCustomizadas()
   ]);
+}
+
+// ──────────────────────────────────────────────
+// CARDS DE SECTIONS CUSTOMIZADAS ("+ Nova Section")
+// ──────────────────────────────────────────────
+async function renderCardsSecoesCustomizadas() {
+  const grid = document.getElementById('dashboard-grid');
+  if (!grid) return;
+  grid.querySelectorAll('[data-custom-card]').forEach(el => el.remove());
+  const secoes = (await carregarSecoesCustomizadas()).filter(s => s.ativo);
+  for (const secao of secoes) {
+    await adicionarCardSecaoCustomizada(secao);
+  }
+}
+
+export async function adicionarCardSecaoCustomizada(secao) {
+  const grid = document.getElementById('dashboard-grid');
+  if (!grid || grid.querySelector(`[data-custom-card="${secao.id}"]`)) return;
+
+  let metrica;
+  try { metrica = await metricaSecao(secao); } catch { metrica = null; }
+
+  const card = document.createElement('div');
+  card.dataset.customCard = secao.id;
+  card.title = `Abrir ${secao.nome}`;
+  card.style.cursor = 'pointer';
+  card.addEventListener('click', () => {
+    window.dispatchEvent(new CustomEvent('cf:ir-para-secao', { detail: { name: `custom-${secao.slug}` } }));
+  });
+
+  if (metrica?.secundaria) {
+    card.className = 'card stat-card orcamento-duplo';
+    card.innerHTML = `
+      <div class="orcamento-item">
+        <div class="stat-icon">${secao.icone || '📁'}</div>
+        <div class="stat-info">
+          <div class="stat-value">${metrica.principal.valor}</div>
+          <div class="stat-label">${escDash(metrica.principal.label)}</div>
+          <div class="stat-sub">${escDash(secao.nome)}</div>
+        </div>
+      </div>
+      <div class="stat-divider"></div>
+      <div class="orcamento-item">
+        <div class="stat-icon">📊</div>
+        <div class="stat-info">
+          <div class="stat-value">${metrica.secundaria.valor}</div>
+          <div class="stat-label">${escDash(metrica.secundaria.label)}</div>
+          <div class="stat-sub">Section customizada</div>
+        </div>
+      </div>`;
+  } else {
+    card.className = 'card stat-card';
+    card.innerHTML = `
+      <div class="stat-icon">${secao.icone || '📁'}</div>
+      <div class="stat-info">
+        <div class="stat-value">${metrica?.principal?.valor ?? '—'}</div>
+        <div class="stat-label">${escDash(metrica?.principal?.label ?? secao.nome)}</div>
+        <div class="stat-sub">${escDash(secao.nome)}${metrica?.sub ? ' · ' + escDash(metrica.sub) : ''}</div>
+      </div>`;
+  }
+
+  grid.appendChild(card);
+}
+
+export function removerCardSecaoCustomizada(secaoId) {
+  document.querySelector(`[data-custom-card="${secaoId}"]`)?.remove();
+}
+
+function escDash(str) {
+  return String(str ?? '')
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
 async function carregarUltimasSaidas() {
@@ -159,7 +234,7 @@ async function carregarConsumoCarro(colecao, idKmL, idRsKm) {
       const kmEfetivo = (parseFloat(item.km) || 0) * (1 - correcao / 100);
       const litros    = parseFloat(item.litros) || 0;
       if (litros > 0 && kmEfetivo > 0)          kmLValores.push(kmEfetivo / litros);
-      if (item.valorPago && kmEfetivo > 0)      rsKmValores.push(parseFloat(item.valorPago) / kmEfetivo);
+      if (item.valorPago && kmEfetivo > 0)      rsKmValores.push((parseFloat(item.valorPago) * litros) / kmEfetivo);
     });
 
     elKmL.textContent  = kmLValores.length

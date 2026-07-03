@@ -5,7 +5,7 @@
  *   focus_afazer         { prioridade, descricao, valor }
  *   focus_feitos         { data: "YYYY-MM-DD", descricao, valor }
  *   focus_manutencao     { descricao, data: "YYYY-MM-DD", kmUltimaTroca, kmProximaTroca, valor }
- *   focus_abastecimento  { data: "YYYY-MM-DD", km, correcao, litros, valorPago, tipoCombustivel }
+ *   focus_abastecimento  { data: "YYYY-MM-DD", km, correcao, litros, valorPago (preço por litro, não o total), tipoCombustivel }
  */
 
 import { db } from './firebase-config.js';
@@ -366,7 +366,7 @@ function renderAbastecimento() {
     const km       = kmEfetivo(item);
     const litros   = parseFloat(item.litros) || 0;
     const kmL      = litros > 0 ? (km / litros).toFixed(2) : null;
-    const rsKm     = (item.valorPago && km > 0) ? (parseFloat(item.valorPago) / km).toFixed(2) : null;
+    const rsKm     = (item.valorPago && km > 0) ? ((parseFloat(item.valorPago) * litros) / km).toFixed(2) : null;
     const correcao = parseFloat(item.correcao) || 0;
     const kmLabel  = correcao > 0
       ? `${esc(item.km)} km (−${correcao}%)`
@@ -453,7 +453,7 @@ function abrirModalAbastecimento(item) {
        <input type="text" id="ab-tipo-novo" placeholder="Ex: GNV">
      </div>
      <div class="form-group">
-       <label>Valor pago (R$) — opcional</label>
+       <label>Valor pago por litro (R$) — opcional</label>
        <input type="number" id="ab-valor" value="${valorPagoInit}" step="0.01" min="0" placeholder="0,00">
      </div>`,
     async () => {
