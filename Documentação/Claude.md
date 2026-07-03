@@ -1,5 +1,7 @@
 # CLAUDE.md — Controle Financeiro
 
+Atue como um engenheiro de software com 20 anos de experiencia, qualquer duvida para um sistema perfeito, pergunte para mim
+
 ## Status do Projeto
 
 ✅ **Sistema criado e completo.** As instruções abaixo desta seção são históricas (fase de criação) e não são mais necessárias para operação.
@@ -12,7 +14,54 @@
 - **Sempre fazer push no GitHub** (não no Firebase diretamente — o GitHub Actions faz o deploy automático)
 - **Queries ao Firestore devem ficar na pasta `Querys/`** (para o bot Render)
 - **Sempre que alterar código que o Agente usa, atualizar `Agente_Financeiro_IA.md`** para garantir que o agente não quebre
+## Git Commit Convention
 
+Sempre que realizar um commit, seguir o padrão **Conventional Commits**.
+
+### Formato
+
+```text
+<emoji> <tipo>: <descrição curta>
+```
+
+Exemplos:
+
+```text
+✨ feat: adicionar cálculo de consumo por tanque
+🐛 fix: corrigir erro na validação do hodômetro
+♻️ refactor: reorganizar lógica de cálculo
+📚 docs: atualizar documentação do projeto
+🎨 style: padronizar formatação do código
+⚡ perf: otimizar processamento dos registros
+🧪 test: adicionar testes para cálculo de autonomia
+🔧 chore: atualizar dependências do projeto
+🚑 hotfix: corrigir falha crítica na produção
+```
+
+### Tipos permitidos
+
+| Emoji | Tipo | Quando usar |
+|--------|------|-------------|
+| ✨ | feat | Nova funcionalidade. |
+| 🐛 | fix | Correção de bug. |
+| 🚑 | hotfix | Correção urgente em produção. |
+| ♻️ | refactor | Reorganização do código sem alterar o comportamento. |
+| ⚡ | perf | Melhoria de desempenho. |
+| 🎨 | style | Alterações de formatação ou estilo do código, sem modificar sua lógica. |
+| 🧪 | test | Adição ou alteração de testes. |
+| 📚 | docs | Alterações na documentação. |
+| 🔧 | chore | Manutenção do projeto, configurações, dependências, scripts, CI/CD, etc. |
+
+### Regras
+
+- Utilizar sempre o tipo mais específico possível.
+- A descrição deve ser curta, objetiva e escrita em português.
+- Escrever a descrição no infinitivo, por exemplo:
+  - `✨ feat: adicionar autenticação`
+  - `🐛 fix: corrigir cálculo de consumo`
+  - `♻️ refactor: simplificar módulo de relatórios`
+- Não utilizar mensagens genéricas como `update`, `ajustes`, `mudanças`, `coisas`, etc.
+- Cada commit deve representar uma alteração lógica única.
 ---
 
 ## Estrutura do Projeto
