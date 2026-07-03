@@ -60,6 +60,14 @@ Telegram → Bot (Render) → Gemini API → Function Calling → Firestore
 | `consultar_contas_casa` | `contas_casa` | Lê contas da casa do mês |
 | `atualizar_conta_casa` | `contas_casa` | Atualiza status/valor/pagante de conta |
 | `consultar_config` | `config` | Lê nomes de colunas configuradas |
+| `criar_coluna_contas_casa` | `config` + `contas_casa` | Cria conta nova permanente em Contas da Casa |
+| `criar_coluna_distribuicao` | `config` + `distribuicao_mensal` | Cria coluna nova permanente na Distribuição Mensal |
+| `consultar_carro` | `carro_feitos`/`carro_afazer` ou `focus_feitos`/`focus_afazer` | Lê gastos feitos e lista a fazer do Focus ou Face |
+| `registrar_gasto_carro` | `carro_feitos` / `focus_feitos` | Registra gasto já realizado no Focus ou Face |
+| `registrar_afazer_carro` | `carro_afazer` / `focus_afazer` | Adiciona item à lista "a fazer" (prioridade automática) |
+| `excluir_item_carro` | `carro_feitos`/`carro_afazer` ou `focus_feitos`/`focus_afazer` | Remove um item de gasto feito ou a fazer |
+| `registrar_abastecimento` | `carro_abastecimento` / `focus_abastecimento` | Registra um abastecimento (km, litros, tipo, valor pago); cadastra o tipo de combustível automaticamente se ainda não existir |
+| `consultar_abastecimento` | `carro_abastecimento` / `focus_abastecimento` | Lê histórico de abastecimentos com km/L e R$/km já calculados, e a média de km/L |
 
 ---
 
@@ -97,6 +105,27 @@ config/contas_casa_colunas
     "Mercado": { defaultPagante: "Digo" }
     "Luz":     { defaultPagante: "Bella" }
 
+carro_feitos/{id}  | focus_feitos/{id}        // gastos já realizados no Focus | Face
+  data:      "2026-06-10"
+  descricao: "Troca de óleo"
+  valor:      180.00
+
+carro_afazer/{id}  | focus_afazer/{id}        // serviços pendentes no Focus | Face
+  prioridade: 1                    // menor = mais urgente
+  descricao:  "Trocar pneu"
+  valor:       450.00
+
+carro_abastecimento/{id} | focus_abastecimento/{id}   // abastecimentos do Focus | Face
+  data:            "2026-07-02"
+  km:               350            // km rodado NESTE tanque, não é odômetro acumulado
+  correcao:         10             // % a descontar do km informado
+  litros:           30
+  valorPago:        180.00         // opcional, pode ser null
+  tipoCombustivel:  "Gasolina"
+
+combustivel_tipos/{id}            // compartilhada entre Focus e Face
+  nome: "Gasolina"
+
 agente_log/{id}                 // registro automático de cada interação
   timestamp:        "2026-06-28T14:30:00.000Z"
   data:             "28/06/2026"
@@ -120,12 +149,13 @@ O app web é organizado como uma planilha com as seções:
 | Distribuição Mensal | `distribuicao_mensal` | Planejamento mensal do salário |
 | Patrimônio | `patrimonio` | Ativos e investimentos |
 | Contas Casa | `contas_casa` | Gastos compartilhados Digo/Bella |
-| Focus | `carro_gastos`, `carro_afazer` | Gastos com Ford Focus |
-| Face | `face_gastos`, `face_afazer` | Gastos com outro carro |
-| Devo/Devem | `devo_devem` | Controle de dívidas |
+| Focus | `carro_feitos`, `carro_afazer`, `carro_abastecimento` | Gastos, a fazer e abastecimento do Ford Focus |
+| Face | `focus_feitos`, `focus_afazer`, `focus_abastecimento` | Gastos, a fazer e abastecimento do outro carro |
+| Devo/Devem | `dividas` | Controle de dívidas |
 
-> O agente atualmente cobre: Banco, Patrimônio, Distribuição Mensal e Contas Casa.
-> Focus, Face e Devo/Devem não têm ferramentas no agente (pode ser expandido).
+> O agente atualmente cobre: Banco, Patrimônio, Distribuição Mensal, Contas Casa, Focus e Face
+> (gastos feitos, a fazer e abastecimento). Devo/Devem ainda não tem ferramentas no agente
+> (pode ser expandido).
 
 ---
 

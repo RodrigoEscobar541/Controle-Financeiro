@@ -54,8 +54,8 @@ O app é organizado como uma planilha com as seguintes seções:
 - Distribuição Mensal: planejamento do salário por mês, cada linha é um mês e cada coluna é uma conta fixa
 - Patrimônio: tabela de ativos e investimentos
 - Contas Casa: gastos da casa por mês, divididos entre Digo e Bella
-- Focus: gastos com o Ford Focus — coleções carro_feitos (gastos feitos) e carro_afazer (lista de serviços pendentes)
-- Face: gastos com o Ecosport/Face — coleções focus_feitos (gastos feitos) e focus_afazer (lista de serviços pendentes)
+- Focus: gastos com o Ford Focus — coleções carro_feitos (gastos feitos), carro_afazer (lista de serviços pendentes) e carro_abastecimento (registro de combustível)
+- Face: gastos com o Ecosport/Face — coleções focus_feitos (gastos feitos), focus_afazer (lista de serviços pendentes) e focus_abastecimento (registro de combustível)
 - Devo/Devem: controle de dívidas (não coberto pelas suas ferramentas)
 
 7. COLEÇÃO: carro_feitos/{id}  — gastos já realizados no Focus
@@ -70,11 +70,24 @@ O app é organizado como uma planilha com as seguintes seções:
 10. COLEÇÃO: focus_afazer/{id}  — serviços pendentes/futuros no Face
     Campos: prioridade (número, quanto menor = mais urgente), descricao (string), valor (número estimado)
 
+11. COLEÇÃO: carro_abastecimento/{id} — abastecimentos do Focus | focus_abastecimento/{id} — abastecimentos do Face
+    Campos: data (YYYY-MM-DD), km (número, km rodado NESTE tanque, não é odômetro acumulado),
+    correcao (número 0-100, % a descontar do km informado), litros (número),
+    valorPago (número ou null, opcional), tipoCombustivel (string, ex: "Gasolina")
+    → km efetivo = km * (1 - correcao/100); km/L = km efetivo / litros; R$/km = valorPago / km efetivo (se houver valorPago)
+    → Use para: registrar um abastecimento e para calcular/informar consumo (km/L) e custo por km de cada carro
+
+12. COLEÇÃO: combustivel_tipos/{id} — tipos de combustível cadastrados (compartilhada entre Focus e Face)
+    Campos: nome (string). Já vem com Gasolina, Etanol e Diesel; o usuário pode ter cadastrado outros (ex: GNV)
+
 REGRAS DE COMPORTAMENTO:
 - Seja direto e objetivo
 - Use formatação Markdown compatível com Telegram (*negrito*, _itálico_, \`código\`)
 - Sempre confirme ações: "✅ Saída registrada: cinema — R$ 42,90"
 - Se não tiver certeza do que o usuário quer, pergunte antes de agir
+- Em registrar_abastecimento, valorPago é opcional: se o usuário não mencionar o valor pago, registre
+  direto com valorPago null — NÃO pergunte por ele. Só informe que o R$/km não pôde ser calculado para
+  aquele registro por falta do valor.
 - Para excluir um lançamento sem ID, consulte primeiro para encontrar o item e mostre ao usuário para confirmar
 - Ao responder sobre valores, sempre formate em R$ (ex: R$ 1.500,00)
 - Ao final de cada resposta, se realizou alguma alteração no BD, liste resumidamente o que foi feito
@@ -294,6 +307,35 @@ const FERRAMENTAS = [
         id:      { type: 'string', description: 'ID do documento a excluir.' }
       },
       required: ['carro', 'colecao', 'id']
+    }
+  },
+  {
+    name: 'registrar_abastecimento',
+    description: 'Registra um abastecimento (enchida de tanque) de um dos carros (Focus ou Face): km rodado, litros, tipo de combustível e valor pago opcional. Se o tipo de combustível informado ainda não existir na lista cadastrada, ele é criado automaticamente.',
+    parameters: {
+      type: 'object',
+      properties: {
+        carro:           { type: 'string', description: '"focus" ou "face".' },
+        km:              { type: 'number', description: 'Km rodado NESTE tanque (não é odômetro acumulado).' },
+        litros:          { type: 'number', description: 'Litros abastecidos.' },
+        tipoCombustivel: { type: 'string', description: 'Nome do tipo de combustível (ex: "Gasolina", "Etanol", "Diesel"). Se não existir na lista, será cadastrado automaticamente.' },
+        correcao:        { type: 'number', description: 'Percentual (0-100) a descontar do km informado, ex: se o painel/GPS costuma superestimar. Opcional, padrão 0.' },
+        valorPago:       { type: 'number', description: 'Valor pago em reais. Opcional.' },
+        data:            { type: 'string', description: 'Data no formato YYYY-MM-DD. Se omitido, usa hoje.' }
+      },
+      required: ['carro', 'km', 'litros', 'tipoCombustivel']
+    }
+  },
+  {
+    name: 'consultar_abastecimento',
+    description: 'Consulta o histórico de abastecimentos de um dos carros (Focus ou Face), já com km/L e R$/km calculados por registro e a média de km/L.',
+    parameters: {
+      type: 'object',
+      properties: {
+        carro:  { type: 'string', description: '"focus" ou "face".' },
+        limite: { type: 'number', description: 'Máximo de registros mais recentes a retornar. Padrão: 10.' }
+      },
+      required: ['carro']
     }
   }
 ];
@@ -574,6 +616,61 @@ async function executarTool(nome, args, db, acoesLog) {
         return { sucesso: true, dados_excluidos: dadosAntes };
       }
 
+      case 'registrar_abastecimento': {
+        const isFocus  = args.carro === 'focus';
+        const colecao  = isFocus ? 'carro_abastecimento' : 'focus_abastecimento';
+        const data     = args.data || dataHoje;
+        const correcao = args.correcao || 0;
+        const valorPago = args.valorPago !== undefined ? args.valorPago : null;
+        const nomeTipo  = String(args.tipoCombustivel || '').trim();
+
+        const tiposSnap = await db.collection('combustivel_tipos').get();
+        const jaExiste   = tiposSnap.docs.some(d => (d.data().nome || '').toLowerCase() === nomeTipo.toLowerCase());
+        if (!jaExiste && nomeTipo) await db.collection('combustivel_tipos').add({ nome: nomeTipo });
+
+        const ref = await db.collection(colecao).add({
+          data, km: args.km, correcao, litros: args.litros, valorPago, tipoCombustivel: nomeTipo
+        });
+
+        const kmEfetivo  = args.km * (1 - correcao / 100);
+        const kmPorLitro = args.litros > 0 ? kmEfetivo / args.litros : null;
+        const rsPorKm    = (valorPago && kmEfetivo > 0) ? valorPago / kmEfetivo : null;
+
+        acoesLog.push({
+          tipo: 'ESCRITA', colecao, id: ref.id,
+          descricao: `Abastecimento ${args.carro}: ${args.km}km, ${args.litros}L, ${nomeTipo}${valorPago ? `, R$ ${valorPago}` : ''}`
+        });
+        return { sucesso: true, id: ref.id, km_efetivo: kmEfetivo, km_por_litro: kmPorLitro, rs_por_km: rsPorKm };
+      }
+
+      case 'consultar_abastecimento': {
+        const isFocus = args.carro === 'focus';
+        const colecao = isFocus ? 'carro_abastecimento' : 'focus_abastecimento';
+        const limite  = args.limite || 10;
+
+        const snap = await db.collection(colecao).orderBy('data', 'desc').limit(limite).get();
+        const registros = snap.docs.map(d => {
+          const item      = { id: d.id, ...d.data() };
+          const correcao  = parseFloat(item.correcao) || 0;
+          const kmEfetivo = (parseFloat(item.km) || 0) * (1 - correcao / 100);
+          const litros    = parseFloat(item.litros) || 0;
+          return {
+            ...item,
+            km_efetivo:  kmEfetivo,
+            km_por_litro: litros > 0 ? kmEfetivo / litros : null,
+            rs_por_km:    (item.valorPago && kmEfetivo > 0) ? item.valorPago / kmEfetivo : null
+          };
+        });
+
+        const validos = registros.filter(r => r.km_por_litro !== null);
+        const mediaKmPorLitro = validos.length
+          ? validos.reduce((s, r) => s + r.km_por_litro, 0) / validos.length
+          : null;
+
+        acoesLog.push({ tipo: 'LEITURA', colecao, descricao: `Consultou ${registros.length} abastecimentos (${args.carro})` });
+        return { sucesso: true, carro: isFocus ? 'Focus' : 'Face', registros, media_km_por_litro: mediaKmPorLitro };
+      }
+
       default:
         return { sucesso: false, erro: `Ferramenta desconhecida: ${nome}` };
     }
@@ -597,7 +694,9 @@ module.exports = async (ctx, db) => {
       '• /agente quais foram meus gastos de junho?\n' +
       '• /agente quanto tenho de patrimônio?\n' +
       '• /agente marca Netflix como pago em junho\n' +
-      '• /agente qual o total das contas da casa esse mês?',
+      '• /agente qual o total das contas da casa esse mês?\n' +
+      '• /agente registra abastecimento do focus, 350km, 30 litros de gasolina, paguei 180 reais\n' +
+      '• /agente qual o consumo médio do face?',
       { parse_mode: 'Markdown' }
     );
   }

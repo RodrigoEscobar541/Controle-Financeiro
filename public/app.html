@@ -172,6 +172,46 @@
           </div>
         </div>
 
+        <div class="card stat-card orcamento-duplo">
+          <div class="orcamento-item">
+            <div class="stat-icon">⛽</div>
+            <div class="stat-info">
+              <div class="stat-value" id="dash-focus-kml">— km/L</div>
+              <div class="stat-label">Consumo Focus</div>
+              <div class="stat-sub">Média últimos 100 abastecimentos</div>
+            </div>
+          </div>
+          <div class="stat-divider"></div>
+          <div class="orcamento-item">
+            <div class="stat-icon">💰</div>
+            <div class="stat-info">
+              <div class="stat-value" id="dash-focus-rskm">R$ —/km</div>
+              <div class="stat-label">Custo por km Focus</div>
+              <div class="stat-sub">Média últimos 100 abastecimentos</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card stat-card orcamento-duplo">
+          <div class="orcamento-item">
+            <div class="stat-icon">⛽</div>
+            <div class="stat-info">
+              <div class="stat-value" id="dash-face-kml">— km/L</div>
+              <div class="stat-label">Consumo Face</div>
+              <div class="stat-sub">Média últimos 100 abastecimentos</div>
+            </div>
+          </div>
+          <div class="stat-divider"></div>
+          <div class="orcamento-item">
+            <div class="stat-icon">💰</div>
+            <div class="stat-info">
+              <div class="stat-value" id="dash-face-rskm">R$ —/km</div>
+              <div class="stat-label">Custo por km Face</div>
+              <div class="stat-sub">Média últimos 100 abastecimentos</div>
+            </div>
+          </div>
+        </div>
+
       </div>
 
       <div class="notas-card">
@@ -423,6 +463,34 @@
         </table>
       </div>
 
+      <!-- ABASTECIMENTO -->
+      <div class="card">
+        <div class="card-header">
+          <h3 class="card-title">⛽ Abastecimento</h3>
+          <div style="display:flex;gap:.5rem">
+            <button id="btn-tipos-combustivel" class="btn-secondary" title="Gerenciar tipos de combustível">⚙️ Tipos</button>
+            <button id="btn-add-abastecimento" class="btn btn-primary">+ Registrar</button>
+          </div>
+        </div>
+        <div class="table-wrapper">
+          <table class="data-table" id="carro-abastecimento-table">
+            <thead>
+              <tr>
+                <th>Data</th>
+                <th>KM</th>
+                <th>Litros</th>
+                <th>Combustível</th>
+                <th class="text-right">Valor pago</th>
+                <th class="text-right">km/L</th>
+                <th class="text-right">R$/km</th>
+                <th style="width:60px"></th>
+              </tr>
+            </thead>
+            <tbody><tr><td colspan="8" class="loading">Carregando...</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+
       <!-- MANUTENÇÃO PREVENTIVA -->
       <div class="card">
         <div class="card-header">
@@ -509,6 +577,34 @@
             </tr>
           </tfoot>
         </table>
+      </div>
+
+      <!-- ABASTECIMENTO -->
+      <div class="card">
+        <div class="card-header">
+          <h3 class="card-title">⛽ Abastecimento</h3>
+          <div style="display:flex;gap:.5rem">
+            <button id="btn-tipos-combustivel-focus" class="btn-secondary" title="Gerenciar tipos de combustível">⚙️ Tipos</button>
+            <button id="btn-add-abastecimento-focus" class="btn btn-primary">+ Registrar</button>
+          </div>
+        </div>
+        <div class="table-wrapper">
+          <table class="data-table" id="focus-abastecimento-table">
+            <thead>
+              <tr>
+                <th>Data</th>
+                <th>KM</th>
+                <th>Litros</th>
+                <th>Combustível</th>
+                <th class="text-right">Valor pago</th>
+                <th class="text-right">km/L</th>
+                <th class="text-right">R$/km</th>
+                <th style="width:60px"></th>
+              </tr>
+            </thead>
+            <tbody><tr><td colspan="8" class="loading">Carregando...</td></tr></tbody>
+          </table>
+        </div>
       </div>
 
       <!-- MANUTENÇÃO PREVENTIVA -->

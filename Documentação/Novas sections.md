@@ -88,6 +88,80 @@ A section é dividida em 3 blocos verticais (ou abas), cada um com sua própria 
 
 ---
 
+## Bloco: Abastecimento (dentro das sections Carro/Focus e Face)
+
+### Visão Geral
+
+4º bloco dentro das sections de carro (`section-carro`/`carro.js` e `section-face`/
+`focus.js`), para registrar cada enchida de tanque e calcular km/L e R$/km de cada
+carro. Segue o mesmo padrão dos outros blocos (onSnapshot + render + modal).
+
+**Coleções por carro:** `carro_abastecimento` (section Carro, rotulada "Focus" na UI)
+e `focus_abastecimento` (section Face, rotulada "Face" na UI) — prefixo segue o
+arquivo/coleção, não o rótulo visível (mesma convenção já usada em afazer/feitos/manutenção).
+
+**Coleção compartilhada:** `combustivel_tipos` — lista gerenciável de tipos de
+combustível (CRUD), usada pelas duas sections. Seedada com 3 defaults (Gasolina,
+Etanol, Diesel) na primeira vez que estiver vazia.
+
+---
+
+### Banco de Dados Firestore
+
+#### Coleções: `carro_abastecimento` / `focus_abastecimento`
+
+```
+{id_aleatorio}: {
+  data:            "2026-07-02",  // YYYY-MM-DD, auto = hoje ao criar, editável
+  km:               350,           // km rodado NESTE tanque (não é odômetro acumulado)
+  correcao:         10,            // % a descontar do km informado (0 = sem correção)
+  litros:           30,
+  valorPago:        180.00,        // opcional (null se não informado)
+  tipoCombustivel:  "Gasolina"     // string solta, denormalizada de combustivel_tipos
+}
+```
+
+`kmEfetivo = km * (1 - correcao/100)` é calculado no front, não persistido.
+A partir dele: `km/L = kmEfetivo / litros` e `R$/km = valorPago / kmEfetivo` (se houver valorPago).
+
+#### Coleção: `combustivel_tipos`
+
+```
+{id_aleatorio}: { nome: "Gasolina" }
+```
+
+---
+
+### Estrutura Visual
+
+Card "⛽ Abastecimento", com botão "⚙️ Tipos" (abre modal de gerenciar tipos) e
+"+ Registrar". Tabela: `Data | KM (com correção) | Litros | Combustível | Valor pago | km/L | R$/km | Ações`.
+
+- Por padrão mostra só o registro mais recente; botão "Carregar mais" soma 5 por clique
+  (mesmo mecanismo do bloco Feitos).
+- Editar/excluir por botão ✏️/🗑️ por linha.
+- No formulário de registro, o select de tipo tem uma opção "+ Novo tipo..." que
+  revela um campo de texto — ao salvar, cria o tipo em `combustivel_tipos` antes de
+  gravar o abastecimento.
+- "Valor pago" é opcional; o último valor digitado fica em `localStorage`
+  (`tf_valorPago_carro` / `tf_valorPago_focus`) só para pré-preencher o campo na
+  próxima abertura do formulário — o valor em si sempre é salvo no Firestore.
+
+---
+
+### Arquivos Criados/Alterados
+
+| Arquivo | Alteração |
+|---------|-----------|
+| `public/js/combustivel-tipos.js` | Criado — CRUD e modal de gerenciamento de `combustivel_tipos`, compartilhado entre as duas sections |
+| `public/js/carro.js` | Bloco Abastecimento para `carro_abastecimento` |
+| `public/js/focus.js` | Bloco Abastecimento para `focus_abastecimento` |
+| `public/app.html` | Card "⛽ Abastecimento" nas duas sections, entre Feitos e Manutenção Preventiva |
+| `Querys/carro-queries.js` / `Querys/focus-queries.js` | CRUD de abastecimento para uso futuro do bot Telegram |
+| `Querys/combustivel-tipos-queries.js` | Criado — CRUD de tipos de combustível para uso futuro do bot Telegram |
+
+---
+
 ---
 
 ## Section: Devo e Devem

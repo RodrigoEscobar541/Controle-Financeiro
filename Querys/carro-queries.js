@@ -1,10 +1,11 @@
 /**
- * Querys — Coleções: carro_afazer, carro_feitos, carro_manutencao
+ * Querys — Coleções: carro_afazer, carro_feitos, carro_manutencao, carro_abastecimento
  * Usadas pelo Bot Render (firebase-admin SDK)
  *
  * carro_afazer    { prioridade: Number, descricao: String, valor: Number }
  * carro_feitos    { data: "YYYY-MM-DD", descricao: String, valor: Number }
  * carro_manutencao { descricao: String, data: "YYYY-MM-DD", kmUltimaTroca: String, kmProximaTroca: String, valor: Number }
+ * carro_abastecimento { data: "YYYY-MM-DD", km: Number, correcao: Number, litros: Number, valorPago: Number|null, tipoCombustivel: String }
  */
 
 async function getAfazer(db) {
@@ -58,8 +59,26 @@ async function excluirManutencao(db, id) {
   return db.collection('carro_manutencao').doc(id).delete();
 }
 
+async function getAbastecimento(db, limite = 50) {
+  const snap = await db.collection('carro_abastecimento').orderBy('data', 'desc').limit(limite).get();
+  return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+}
+
+async function adicionarAbastecimento(db, { data, km, correcao, litros, valorPago, tipoCombustivel }) {
+  return db.collection('carro_abastecimento').add({ data, km, correcao, litros, valorPago, tipoCombustivel });
+}
+
+async function atualizarAbastecimento(db, id, { data, km, correcao, litros, valorPago, tipoCombustivel }) {
+  return db.collection('carro_abastecimento').doc(id).update({ data, km, correcao, litros, valorPago, tipoCombustivel });
+}
+
+async function excluirAbastecimento(db, id) {
+  return db.collection('carro_abastecimento').doc(id).delete();
+}
+
 module.exports = {
   getAfazer, adicionarAfazer, atualizarAfazer, excluirAfazer,
   getFeitos, adicionarFeito, atualizarFeito, excluirFeito,
   getManutencao, adicionarManutencao, atualizarManutencao, excluirManutencao,
+  getAbastecimento, adicionarAbastecimento, atualizarAbastecimento, excluirAbastecimento,
 };

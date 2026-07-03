@@ -13,7 +13,9 @@ export async function initDashboard() {
     carregarOrcamentoProximoMes(),
     carregarContasCasaMes(),
     carregarTotalInvestimentos(),
-    carregarDevoDeve()
+    carregarDevoDeve(),
+    carregarConsumoCarro('carro_abastecimento', 'dash-focus-kml', 'dash-focus-rskm'),
+    carregarConsumoCarro('focus_abastecimento', 'dash-face-kml', 'dash-face-rskm')
   ]);
 }
 
@@ -138,6 +140,37 @@ async function carregarTotalInvestimentos() {
     el.textContent = fmtBRL(total);
   } catch {
     el.textContent = '—';
+  }
+}
+
+// Consumo médio (km/L e R$/km) dos últimos 100 abastecimentos de um carro
+async function carregarConsumoCarro(colecao, idKmL, idRsKm) {
+  const elKmL  = document.getElementById(idKmL);
+  const elRsKm = document.getElementById(idRsKm);
+  try {
+    const q    = query(collection(db, colecao), orderBy('data', 'desc'), limit(100));
+    const snap = await getDocs(q);
+
+    const kmLValores  = [];
+    const rsKmValores = [];
+    snap.docs.forEach(d => {
+      const item      = d.data();
+      const correcao  = parseFloat(item.correcao) || 0;
+      const kmEfetivo = (parseFloat(item.km) || 0) * (1 - correcao / 100);
+      const litros    = parseFloat(item.litros) || 0;
+      if (litros > 0 && kmEfetivo > 0)          kmLValores.push(kmEfetivo / litros);
+      if (item.valorPago && kmEfetivo > 0)      rsKmValores.push(parseFloat(item.valorPago) / kmEfetivo);
+    });
+
+    elKmL.textContent  = kmLValores.length
+      ? `${(kmLValores.reduce((s, v) => s + v, 0) / kmLValores.length).toFixed(2)} km/L`
+      : '—';
+    elRsKm.textContent = rsKmValores.length
+      ? `${fmtBRL(rsKmValores.reduce((s, v) => s + v, 0) / rsKmValores.length)}/km`
+      : '—';
+  } catch {
+    elKmL.textContent  = '—';
+    elRsKm.textContent = '—';
   }
 }
 

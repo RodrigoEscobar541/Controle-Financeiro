@@ -2,7 +2,8 @@
  * Querys — Dashboard (leituras agregadas)
  * Usadas pelo Bot Render (firebase-admin SDK)
  *
- * Agrega dados de: banco, distribuicao_mensal, contas_casa, patrimonio, dividas
+ * Agrega dados de: banco, distribuicao_mensal, contas_casa, patrimonio, dividas,
+ * carro_abastecimento, focus_abastecimento
  */
 
 async function getUltimasTransacoes(db, tipo, limite = 5) {
@@ -48,10 +49,32 @@ async function getTotalDividas(db) {
   return { totalDevo, totalDevem };
 }
 
+async function getConsumoCarro(db, colecao, limite = 100) {
+  const snap = await db.collection(colecao).orderBy('data', 'desc').limit(limite).get();
+
+  const kmLValores  = [];
+  const rsKmValores = [];
+  snap.docs.forEach(d => {
+    const item      = d.data();
+    const correcao  = parseFloat(item.correcao) || 0;
+    const kmEfetivo = (parseFloat(item.km) || 0) * (1 - correcao / 100);
+    const litros    = parseFloat(item.litros) || 0;
+    if (litros > 0 && kmEfetivo > 0)     kmLValores.push(kmEfetivo / litros);
+    if (item.valorPago && kmEfetivo > 0) rsKmValores.push(parseFloat(item.valorPago) / kmEfetivo);
+  });
+
+  return {
+    mediaKmPorLitro: kmLValores.length  ? kmLValores.reduce((s, v) => s + v, 0) / kmLValores.length   : null,
+    mediaRsPorKm:    rsKmValores.length ? rsKmValores.reduce((s, v) => s + v, 0) / rsKmValores.length : null,
+    amostras: snap.size
+  };
+}
+
 module.exports = {
   getUltimasTransacoes,
   getOrcamentoMensal,
   getContasCasaMes,
   getTotalInvestimentos,
   getTotalDividas,
+  getConsumoCarro,
 };

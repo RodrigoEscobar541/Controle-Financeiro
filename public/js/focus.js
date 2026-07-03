@@ -2,24 +2,31 @@
  * Focus
  *
  * Estrutura Firestore:
- *   focus_afazer     { prioridade, descricao, valor }
- *   focus_feitos     { data: "YYYY-MM-DD", descricao, valor }
- *   focus_manutencao { descricao, data: "YYYY-MM-DD", kmUltimaTroca, kmProximaTroca, valor }
+ *   focus_afazer         { prioridade, descricao, valor }
+ *   focus_feitos         { data: "YYYY-MM-DD", descricao, valor }
+ *   focus_manutencao     { descricao, data: "YYYY-MM-DD", kmUltimaTroca, kmProximaTroca, valor }
+ *   focus_abastecimento  { data: "YYYY-MM-DD", km, correcao, litros, valorPago, tipoCombustivel }
  */
 
 import { db } from './firebase-config.js';
 import { fmtBRL, fmtDate, showToast, openModal } from './app.js';
+import { subscribeTiposCombustivel, adicionarTipoCombustivel, abrirModalGerenciarTipos } from './combustivel-tipos.js';
 import {
   collection, query, orderBy, where, onSnapshot,
   addDoc, deleteDoc, updateDoc, doc
 } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
 
-let afazer         = [];
-let feitos         = [];
-let manutencao     = [];
-let unsubs         = [];
-let feitosVisiveis = 5;
-let mostrarAntigos = false;
+let afazer               = [];
+let feitos               = [];
+let manutencao           = [];
+let abastecimento        = [];
+let tiposCombustivel     = [];
+let unsubs               = [];
+let feitosVisiveis       = 5;
+let abastecimentoVisiveis = 1;
+let mostrarAntigos       = false;
+
+const LS_VALOR_PAGO = 'tf_valorPago_focus';
 
 function corteUmAno() {
   const d = new Date();
@@ -31,6 +38,9 @@ export function initFocus() {
   document.getElementById('btn-add-afazer-focus').addEventListener('click',     () => abrirModalAfazer());
   document.getElementById('btn-add-feito-focus').addEventListener('click',      () => abrirModalFeito());
   document.getElementById('btn-add-manutencao-focus').addEventListener('click', () => abrirModalManutencao());
+  document.getElementById('btn-add-abastecimento-focus').addEventListener('click', () => abrirModalAbastecimento());
+  document.getElementById('btn-tipos-combustivel-focus').addEventListener('click', () => abrirModalGerenciarTipos(tiposCombustivel));
+  subscribeTiposCombustivel(lista => { tiposCombustivel = lista; });
   subscribeAll();
 }
 
@@ -58,6 +68,12 @@ function subscribeAll() {
     collection(db, 'focus_manutencao'),
     snap => { manutencao = snap.docs.map(d => ({ id: d.id, ...d.data() })); renderManutencao(); },
     () => showToast('Erro ao carregar Manutenção.', 'error')
+  ));
+
+  unsubs.push(onSnapshot(
+    query(collection(db, 'focus_abastecimento'), orderBy('data', 'desc')),
+    snap => { abastecimento = snap.docs.map(d => ({ id: d.id, ...d.data() })); renderAbastecimento(); },
+    () => showToast('Erro ao carregar Abastecimento.', 'error')
   ));
 }
 
@@ -327,6 +343,160 @@ function abrirModalManutencao(item) {
     },
     editar ? 'Salvar' : 'Adicionar'
   );
+}
+
+// ── ABASTECIMENTO ─────────────────────────────────────────────────────────────
+
+function kmEfetivo(item) {
+  const correcao = parseFloat(item.correcao) || 0;
+  return (parseFloat(item.km) || 0) * (1 - correcao / 100);
+}
+
+function renderAbastecimento() {
+  const tbody = document.querySelector('#focus-abastecimento-table tbody');
+
+  if (abastecimento.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="8" class="empty-state">Nenhum abastecimento registrado.</td></tr>`;
+    return;
+  }
+
+  const visiveis = abastecimento.slice(0, abastecimentoVisiveis);
+
+  tbody.innerHTML = visiveis.map(item => {
+    const km       = kmEfetivo(item);
+    const litros   = parseFloat(item.litros) || 0;
+    const kmL      = litros > 0 ? (km / litros).toFixed(2) : null;
+    const rsKm     = (item.valorPago && km > 0) ? (parseFloat(item.valorPago) / km).toFixed(2) : null;
+    const correcao = parseFloat(item.correcao) || 0;
+    const kmLabel  = correcao > 0
+      ? `${esc(item.km)} km (−${correcao}%)`
+      : `${esc(item.km)} km`;
+
+    return `<tr>
+      <td>${fmtDate(item.data)}</td>
+      <td>${kmLabel}</td>
+      <td>${esc(item.litros)} L</td>
+      <td>${esc(item.tipoCombustivel)}</td>
+      <td class="text-right">${item.valorPago ? fmtBRL(item.valorPago) : '—'}</td>
+      <td class="text-right">${kmL ?? '—'}</td>
+      <td class="text-right">${rsKm ? fmtBRL(rsKm) : '—'}</td>
+      <td style="text-align:center;white-space:nowrap">
+        <button class="btn-icon" data-action="edit"   data-id="${item.id}" title="Editar">✏️</button>
+        <button class="btn-icon" data-action="delete" data-id="${item.id}" title="Excluir">🗑️</button>
+      </td>
+    </tr>`;
+  }).join('');
+
+  if (abastecimento.length > abastecimentoVisiveis) {
+    const restantes = abastecimento.length - abastecimentoVisiveis;
+    tbody.innerHTML += `<tr>
+      <td colspan="8" style="text-align:center;padding:.6rem 0">
+        <button id="btn-abastecimento-mais-focus" class="btn-secondary">Carregar mais (${restantes})</button>
+      </td>
+    </tr>`;
+  }
+
+  tbody.querySelectorAll('[data-action="edit"]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const item = abastecimento.find(a => a.id === btn.dataset.id);
+      if (item) abrirModalAbastecimento(item);
+    });
+  });
+  tbody.querySelectorAll('[data-action="delete"]').forEach(btn => {
+    btn.addEventListener('click', () => excluirItem('focus_abastecimento', btn.dataset.id, abastecimento));
+  });
+
+  const btnMais = document.getElementById('btn-abastecimento-mais-focus');
+  if (btnMais) {
+    btnMais.addEventListener('click', () => { abastecimentoVisiveis += 5; renderAbastecimento(); });
+  }
+}
+
+function abrirModalAbastecimento(item) {
+  const editar        = !!item;
+  const hoje          = new Date().toISOString().split('T')[0];
+  const valorPagoInit = editar ? (item.valorPago ?? '') : (localStorage.getItem(LS_VALOR_PAGO) ?? '');
+
+  const opcoesTipo = tiposCombustivel.map(t =>
+    `<option value="${esc(t.nome)}" ${editar && item.tipoCombustivel === t.nome ? 'selected' : ''}>${esc(t.nome)}</option>`
+  ).join('');
+
+  openModal(
+    editar ? 'Editar Abastecimento' : 'Registrar Abastecimento',
+    `<div class="form-group">
+       <label>Data</label>
+       <input type="date" id="ab-data" value="${editar ? item.data : hoje}">
+     </div>
+     <div class="form-group">
+       <label>KM rodado no tanque</label>
+       <input type="number" id="ab-km" value="${editar ? item.km : ''}" step="0.1" min="0" placeholder="Ex: 350">
+     </div>
+     <div class="form-group">
+       <label>Correção (%)</label>
+       <input type="number" id="ab-correcao" value="${editar ? (item.correcao ?? 0) : 0}" step="1" min="0" max="100" placeholder="0">
+       <small>% a descontar do km informado (ex: painel/GPS superestimado)</small>
+     </div>
+     <div class="form-group">
+       <label>Litros abastecidos</label>
+       <input type="number" id="ab-litros" value="${editar ? item.litros : ''}" step="0.01" min="0" placeholder="Ex: 30">
+     </div>
+     <div class="form-group">
+       <label>Tipo de combustível</label>
+       <select id="ab-tipo">
+         ${opcoesTipo}
+         <option value="__novo__">+ Novo tipo...</option>
+       </select>
+     </div>
+     <div class="form-group" id="ab-tipo-novo-wrap" style="display:none">
+       <label>Nome do novo tipo</label>
+       <input type="text" id="ab-tipo-novo" placeholder="Ex: GNV">
+     </div>
+     <div class="form-group">
+       <label>Valor pago (R$) — opcional</label>
+       <input type="number" id="ab-valor" value="${valorPagoInit}" step="0.01" min="0" placeholder="0,00">
+     </div>`,
+    async () => {
+      const data     = document.getElementById('ab-data').value;
+      const km       = parseFloat(document.getElementById('ab-km').value);
+      const correcao = parseFloat(document.getElementById('ab-correcao').value) || 0;
+      const litros   = parseFloat(document.getElementById('ab-litros').value);
+      const valorStr = document.getElementById('ab-valor').value;
+      const valorPago = valorStr === '' ? null : parseFloat(valorStr);
+      let tipoCombustivel = document.getElementById('ab-tipo').value;
+
+      if (!data || isNaN(km) || km < 0 || isNaN(litros) || litros <= 0) {
+        showToast('Preencha data, km e litros corretamente.', 'error'); return;
+      }
+
+      if (tipoCombustivel === '__novo__') {
+        const novoNome = document.getElementById('ab-tipo-novo').value.trim();
+        if (!novoNome) { showToast('Informe o nome do novo tipo.', 'error'); return; }
+        try {
+          await adicionarTipoCombustivel(novoNome);
+          tipoCombustivel = novoNome;
+        } catch { showToast('Erro ao criar tipo de combustível.', 'error'); return; }
+      }
+
+      const payload = { data, km, correcao, litros, valorPago, tipoCombustivel };
+      try {
+        if (editar) {
+          await updateDoc(doc(db, 'focus_abastecimento', item.id), payload);
+          showToast('Abastecimento atualizado!', 'success');
+        } else {
+          await addDoc(collection(db, 'focus_abastecimento'), payload);
+          showToast('Abastecimento registrado!', 'success');
+        }
+        if (valorPago !== null) localStorage.setItem(LS_VALOR_PAGO, String(valorPago));
+      } catch { showToast('Erro ao salvar.', 'error'); }
+    },
+    editar ? 'Salvar' : 'Registrar'
+  );
+
+  const selectTipo = document.getElementById('ab-tipo');
+  const novoWrap   = document.getElementById('ab-tipo-novo-wrap');
+  selectTipo.addEventListener('change', () => {
+    novoWrap.style.display = selectTipo.value === '__novo__' ? '' : 'none';
+  });
 }
 
 // ── HELPERS ───────────────────────────────────────────────────────────────────
