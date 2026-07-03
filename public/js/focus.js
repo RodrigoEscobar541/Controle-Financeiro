@@ -417,9 +417,10 @@ function abrirModalAbastecimento(item) {
   const hoje          = new Date().toISOString().split('T')[0];
   const valorPagoInit = editar ? (item.valorPago ?? '') : (localStorage.getItem(LS_VALOR_PAGO) ?? '');
 
-  const opcoesTipo = tiposCombustivel.map(t =>
-    `<option value="${esc(t.nome)}" ${editar && item.tipoCombustivel === t.nome ? 'selected' : ''}>${esc(t.nome)}</option>`
-  ).join('');
+  const opcoesTipo = tiposCombustivel.map(t => {
+    const selecionado = editar ? (item.tipoCombustivel === t.nome) : (t.nome === 'Gasolina');
+    return `<option value="${esc(t.nome)}" ${selecionado ? 'selected' : ''}>${esc(t.nome)}</option>`;
+  }).join('');
 
   openModal(
     editar ? 'Editar Abastecimento' : 'Registrar Abastecimento',
