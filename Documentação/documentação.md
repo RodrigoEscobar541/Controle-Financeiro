@@ -131,6 +131,17 @@ Configurações dinâmicas (lista de colunas criadas pelo usuário).
 "contas_casa_colunas":  { colunas: { "Mercado": { defaultPagante:"Digo" }, ... } }
 ```
 
+### Coleção: `sistema`
+Estado interno do sistema. Doc `status_bot` = heartbeat do bot (escrito só pelo
+bot, a cada ~1 min; a dashboard só lê para o selo online/offline).
+```
+"status_bot": {
+  atualizado_em: "2026-07-18T21:00:00.000Z",  // último batimento
+  iniciado_em:   "2026-07-18T20:31:00.000Z",  // boot do processo (uptime)
+  versao:        "1.0.0"
+}
+```
+
 ---
 
 ## Comandos do Bot Telegram
@@ -200,16 +211,48 @@ O bot roda num VPS Linux gerenciado pelo **pm2**. Requer **Node.js ≥ 18**.
    pm2 save && pm2 startup   # rode também o comando que o startup imprimir
    ```
 
-**Atualizar o bot depois de um push no GitHub:**
+**Deploy automático (cron na VPS):** todo push na `main` vira produção em até
+~2 min, sem intervenção. O script `scripts/vps-deploy.sh` (versionado) é chamado
+por um cron: faz `git fetch`, e só quando há commit novo puxa, checa a sintaxe
+do `index.js` e reinicia o bot pelo pm2 (não sobe código com erro de sintaxe).
+
+Requisito para o cron funcionar sem senha: o repositório na VPS precisa usar
+**SSH com deploy key** (o `git pull` por HTTPS pediria token a cada vez).
+Instalação (uma vez):
 
 ```bash
-cd ~/"Controle-Financeiro/Bot Render"
-git pull
-pm2 restart controle-financeiro-bot
+# 1) chave SSH dedicada a este repo
+ssh-keygen -t ed25519 -C "vps-deploy-cf" -f ~/.ssh/id_deploy_cf -N ""
+# 2) alias de host (para conviver com a deploy key de outros repos)
+cat >> ~/.ssh/config <<'EOF'
+
+Host github-cf
+  HostName github.com
+  IdentityFile ~/.ssh/id_deploy_cf
+  IdentitiesOnly yes
+EOF
+chmod 600 ~/.ssh/config
+cat ~/.ssh/id_deploy_cf.pub   # → GitHub: repo Controle-Financeiro → Settings → Deploy keys → Add (só leitura)
+# 3) apontar o remote para SSH via o alias e testar
+cd ~/Controle-Financeiro
+git remote set-url origin git@github-cf:RodrigoEscobar541/Controle-Financeiro.git
+ssh -T git@github-cf && git pull
+# 4) agendar o deploy
+chmod +x scripts/vps-deploy.sh
+crontab -e   # adicionar:
+# */2 * * * * /root/Controle-Financeiro/scripts/vps-deploy.sh >> /root/deploy-cf.log 2>&1
 ```
+
+Acompanhar: `tail -f /root/deploy-cf.log`. Deploy/atualização manual, se
+precisar: `bash ~/Controle-Financeiro/scripts/vps-deploy.sh`.
 
 > `.env` e `serviceAccountKey.json` estão no `.gitignore` — o `git pull` nunca
 > os sobrescreve. Comandos úteis: `pm2 status`, `pm2 logs controle-financeiro-bot`.
+
+**Status do bot (heartbeat):** o bot grava `sistema/status_bot` no Firestore a
+cada ~1 min (`atualizado_em`, `iniciado_em`, `versao`). A dashboard (topo do
+Dashboard) mostra um selo 🟢 **online** (batimento < 3 min) / 🔴 **offline**,
+que vira offline sozinho se o bot cair — substitui o antigo monitor externo.
 
 **Credencial do Firebase (`index.js`):** a inicialização do Admin SDK prioriza
 o arquivo `serviceAccountKey.json` (usado no VPS) e, se ele não existir, cai

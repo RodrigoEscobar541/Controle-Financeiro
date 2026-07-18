@@ -103,6 +103,27 @@ bot.on('text', ctx => ctx.reply(
 const http = require('http');
 http.createServer((req, res) => res.end('Bot está vivo!')).listen(process.env.PORT || 3000);
 
+// ─── Heartbeat (status do bot para a dashboard) ──────────────
+// O bot é orientado a eventos (long polling), sem loop próprio; então um
+// setInterval grava um "batimento" no Firestore (sistema/status_bot) a cada
+// ~1 min. A dashboard usa `atualizado_em` para mostrar o bot como online/offline
+// — visibilidade do processo 24/7 na VPS, onde não há monitor externo.
+const BOT_INICIADO_EM = new Date().toISOString();
+const VERSAO_BOT = require('./package.json').version;
+async function gravarStatusBot() {
+  try {
+    await db.collection('sistema').doc('status_bot').set({
+      atualizado_em: new Date().toISOString(),
+      iniciado_em: BOT_INICIADO_EM,
+      versao: VERSAO_BOT,
+    }, { merge: true });
+  } catch (err) {
+    console.error('Falha ao gravar status_bot:', err.message);
+  }
+}
+gravarStatusBot();                      // primeiro batimento imediato
+setInterval(gravarStatusBot, 60_000);   // depois, a cada 1 minuto
+
 // ─── Start ───────────────────────────────────────────────────
 bot.launch()
   .then(() => console.log('✅ Bot iniciado com sucesso!'))

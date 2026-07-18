@@ -3,11 +3,58 @@ import { fmtBRL, fmtDate, mesAtualId, idToLabel, mesAtualLabel } from './app.js'
 import { carregarSecoesCustomizadas } from './section-templates.js';
 import { metricaSecao } from './custom-sections.js';
 import {
-  collection, query, orderBy, where, limit, getDocs, doc, getDoc
+  collection, query, orderBy, where, limit, getDocs, doc, getDoc, onSnapshot
 } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
+
+// ──────────────────────────────────────────────
+// STATUS DO BOT (heartbeat sistema/status_bot)
+// ──────────────────────────────────────────────
+// O bot grava sistema/status_bot a cada ~1 min. Online = último batimento com
+// menos de 3 min; senão, provavelmente caiu (ou a VPS reiniciou).
+const STATUS_BOT_ONLINE_MS = 3 * 60_000;
+let statusBotUnsub = null;
+let statusBotData  = null;
+
+function humanizarDesde(ms) {
+  const s = Math.max(0, Math.floor(ms / 1000));
+  if (s < 60) return `há ${s}s`;
+  const m = Math.floor(s / 60);
+  if (m < 60) return `há ${m} min`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `há ${h}h`;
+  return `há ${Math.floor(h / 24)}d`;
+}
+
+function renderStatusBot() {
+  const el = document.getElementById('status-bot');
+  if (!el) return;
+  if (!statusBotData?.atualizado_em) { el.hidden = true; return; }
+  const desde  = Date.now() - Date.parse(statusBotData.atualizado_em);
+  const online = desde < STATUS_BOT_ONLINE_MS;
+  el.hidden = false;
+  el.className = `status-bot ${online ? 'online' : 'offline'}`;
+  const versao = statusBotData.versao ? ` · v${statusBotData.versao}` : '';
+  const quando = online ? 'ativo agora' : `sem sinal ${humanizarDesde(desde)}`;
+  const uptime = online && statusBotData.iniciado_em
+    ? ` · no ar ${humanizarDesde(Date.now() - Date.parse(statusBotData.iniciado_em))}`
+    : '';
+  el.textContent = `${online ? '🟢 Bot online' : '🔴 Bot offline'} — ${quando}${uptime}${versao}`;
+}
+
+function iniciarStatusBot() {
+  if (statusBotUnsub) return; // liga o listener uma vez só
+  statusBotUnsub = onSnapshot(doc(db, 'sistema', 'status_bot'), snap => {
+    statusBotData = snap.data() ?? null;
+    renderStatusBot();
+  });
+  // "online" depende do tempo decorrido: reavalia sozinho para virar offline
+  // mesmo sem chegar um snapshot novo.
+  setInterval(renderStatusBot, 30_000);
+}
 
 // Limita 5 leituras por tabela e usa os dados cacheados no dashboard
 export async function initDashboard() {
+  iniciarStatusBot();
   await Promise.all([
     carregarUltimasSaidas(),
     carregarUltimasEntradas(),
