@@ -18,7 +18,16 @@ const cmdDevem                = require('./commands/devem');
 const cmdAgente               = require('./commands/agente');
 
 // ─── Firebase Admin ──────────────────────────────────────────
-const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
+// Credencial da conta de serviço: prioriza o arquivo local
+// serviceAccountKey.json (usado no VPS — JSON multi-linha, à prova de
+// dotenv); se não existir, cai para a variável de ambiente
+// FIREBASE_SERVICE_ACCOUNT (usada no Render / .env como JSON em uma linha).
+const fs   = require('fs');
+const path = require('path');
+const caminhoChave = path.join(__dirname, 'serviceAccountKey.json');
+const serviceAccount = fs.existsSync(caminhoChave)
+  ? require('./serviceAccountKey.json')
+  : JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
 admin.initializeApp({ credential: admin.credential.cert(serviceAccount) });
 const db = admin.firestore();
 

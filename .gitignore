@@ -10,6 +10,10 @@ node_modules/
 .firebase/
 firebase-debug.log
 
+# Chave da conta de serviço do Firebase (SEGREDO — NUNCA commitar!)
+serviceAccountKey.json
+**/serviceAccountKey.json
+
 # Logs
 *.log
 npm-debug.log*
