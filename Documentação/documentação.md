@@ -12,9 +12,17 @@ Sistema web de controle financeiro pessoal com interface tipo planilha, autentic
 GitHub (código) → GitHub Actions → Firebase Hosting (front-end)
                                  → Firestore (banco de dados)
 
-Telegram Bot (Render) → Firestore (leitura/escrita direta)
-                      → GitHub Actions (via repository_dispatch) → Agente IA (Claude API)
+Telegram Bot (VPS Contabo · pm2) → Firestore (leitura/escrita direta)
+                                 → GitHub Actions (via repository_dispatch) → Agente IA (Claude API)
 ```
+
+> **Hospedagem do bot (desde 2026-07-18):** o bot roda 24/7 num **VPS Contabo
+> (Linux)** gerenciado pelo **pm2**, que o mantém vivo e o reinicia sozinho em
+> quedas/reboot. Substituiu o **Render** (que hibernava no plano free) e o
+> **UptimeRobot** (que existia só para pingar o Render e impedir a
+> hibernação) — ambos foram desativados. O bot usa *long polling* do Telegram,
+> então não precisa de porta pública nem de ping externo. A pasta continua
+> chamada `Bot Render/` por histórico; o nome não reflete mais a hospedagem.
 
 ---
 
@@ -42,10 +50,12 @@ Controle-Financeiro/
 │   ├── distribuicao-queries.js
 │   └── contas-casa-queries.js
 │
-├── Bot Render/                    ← Bot Telegram (hospedado no Render)
-│   ├── index.js                   ← Entrada do bot
+├── Bot Render/                    ← Bot Telegram (roda no VPS Contabo via pm2)
+│   ├── index.js                   ← Entrada do bot (long polling)
 │   ├── package.json
 │   ├── .env.example               ← ⚠️ Copie para .env e preencha
+│   ├── .env                       ← (não versionado) segredos do bot
+│   ├── serviceAccountKey.json     ← (não versionado) chave Firebase no VPS
 │   └── commands/
 │       ├── saida.js               ← Comando /saida
 │       ├── entrada.js             ← Comando /entrada
@@ -166,16 +176,47 @@ Acesse: **GitHub → Repositório → Settings → Secrets → Actions**
 4. Na pasta `Bot Render/`, copie `.env.example` para `.env` e preencha
 5. Descubra seu `TELEGRAM_CHAT_ID_AUTORIZADO`: inicie o bot e envie `/start` — o ID aparece no log
 
-### 4. Render (Bot)
+### 4. VPS Contabo (Bot) — hospedagem atual
 
-1. Acesse [render.com](https://render.com)
-2. Crie um novo **Web Service** → "Connect a repository"
-3. Selecione este repositório e defina o **Root Directory** como `Bot Render`
-4. **Build Command:** `npm install` | **Start Command:** `node index.js`
-5. Adicione as variáveis de ambiente nas configurações do serviço
-6. O Render iniciará automaticamente com `npm start`
+O bot roda num VPS Linux gerenciado pelo **pm2**. Requer **Node.js ≥ 18**.
 
-### 5. Deploy Automático
+**Primeira instalação:**
+
+1. No VPS, instale Node.js e git, depois clone o repositório:
+   ```bash
+   curl -fsSL https://deb.nodesource.com/setup_20.x | bash - && apt-get install -y nodejs git
+   git clone https://github.com/RodrigoEscobar541/Controle-Financeiro.git
+   cd "Controle-Financeiro/Bot Render" && npm install
+   ```
+2. Crie o `.env` com os segredos (ver `.env.example`): `TELEGRAM_BOT_TOKEN`,
+   `GITHUB_TOKEN`, `GITHUB_REPO`, `TELEGRAM_CHAT_ID_AUTORIZADO`, `GEMINI_API_KEY`.
+3. Crie o `serviceAccountKey.json` com o JSON completo da conta de serviço do
+   Firebase (pode ser multi-linha — é um arquivo `.json`, não passa pelo dotenv).
+   Valide: `node -e "JSON.parse(require('fs').readFileSync('serviceAccountKey.json','utf8')); console.log('OK')"`.
+4. Suba com o pm2 e deixe persistente entre reboots:
+   ```bash
+   npm install -g pm2
+   pm2 start index.js --name controle-financeiro-bot
+   pm2 save && pm2 startup   # rode também o comando que o startup imprimir
+   ```
+
+**Atualizar o bot depois de um push no GitHub:**
+
+```bash
+cd ~/"Controle-Financeiro/Bot Render"
+git pull
+pm2 restart controle-financeiro-bot
+```
+
+> `.env` e `serviceAccountKey.json` estão no `.gitignore` — o `git pull` nunca
+> os sobrescreve. Comandos úteis: `pm2 status`, `pm2 logs controle-financeiro-bot`.
+
+**Credencial do Firebase (`index.js`):** a inicialização do Admin SDK prioriza
+o arquivo `serviceAccountKey.json` (usado no VPS) e, se ele não existir, cai
+para a variável de ambiente `FIREBASE_SERVICE_ACCOUNT` (compatível com o
+antigo deploy no Render / `.env` em uma linha). Assim funciona nos dois cenários.
+
+### 5. Deploy Automático (front-end)
 
 Após configurar os Secrets, qualquer push na branch `main` com alterações em `public/` fará deploy automático no Firebase Hosting.
 

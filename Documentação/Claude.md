@@ -71,9 +71,15 @@ Veja `documentação.md` na raiz do projeto para a documentação completa.
 **Resumo dos arquivos:**
 - `public/` → App web (Firebase Hosting)
 - `Querys/` → Queries Firestore para o bot
-- `Bot Render/` → Bot Telegram (hospedado no Render)
+- `Bot Render/` → Bot Telegram (roda no **VPS Contabo** via pm2; a pasta mantém o nome antigo por histórico)
 - `scripts/agente-ia.js` → Agente IA (roda no GitHub Actions)
 - `.github/workflows/` → CI/CD automático
+
+> **Hospedagem do bot (desde 2026-07-18):** migrado do Render para um **VPS
+> Contabo (Linux) + pm2**. O UptimeRobot foi desativado (era só para manter o
+> Render acordado). Como atualizar o bot no VPS e detalhes da credencial do
+> Firebase (`serviceAccountKey.json` com fallback para `FIREBASE_SERVICE_ACCOUNT`):
+> ver `documentação.md` → seção "VPS Contabo (Bot)".
 
 ---
 
@@ -85,7 +91,7 @@ Para configurar o sistema do zero, você precisará de:
 |-----------|-----------|-------------|
 | Firebase Config (apiKey, projectId, etc.) | Console Firebase → Configurações → Seus Apps | `public/js/firebase-config.js` |
 | Firebase Project ID | Console Firebase | `.firebaserc` |
-| Firebase Service Account (JSON) | Console Firebase → Contas de Serviço | GitHub Secret: `FIREBASE_SERVICE_ACCOUNT` |
+| Firebase Service Account (JSON) | Console Firebase → Contas de Serviço | GitHub Secret: `FIREBASE_SERVICE_ACCOUNT` (Actions) + arquivo `Bot Render/serviceAccountKey.json` no VPS (bot) |
 | Telegram Bot Token | @BotFather no Telegram → /newbot | GitHub Secret `TELEGRAM_BOT_TOKEN` + `Bot Render/.env` |
 | Anthropic API Key | console.anthropic.com | GitHub Secret: `ANTHROPIC_API_KEY` |
 | GitHub Personal Access Token | GitHub → Settings → Developer settings → PAT | `Bot Render/.env` como `GITHUB_TOKEN` |
