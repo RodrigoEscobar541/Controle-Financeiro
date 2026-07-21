@@ -82,7 +82,7 @@ banco/{id}
 
 patrimonio/{id}
   nomeDoAtivo:      "BTC"
-  plataforma:       "Mercado Bitcoin"   // exibido como "Tipo"
+  plataforma:       "Mercado Bitcoin"   // exibido como "Descrição"
   tipoInvestimento: "Criptomoeda"       // divisão do gráfico pizza (patrimonioDivisoes)
   valor:            2180.00             // exibido como "Valor investido"
 

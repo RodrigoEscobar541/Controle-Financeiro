@@ -136,7 +136,7 @@ function formHtml(ativo = {}) {
       <input type="text" id="ativo-nome" value="${escAttr(ativo.nomeDoAtivo || '')}" placeholder="Ex: BTC, Tesouro Selic">
     </div>
     <div class="form-group">
-      <label>Tipo</label>
+      <label>Descrição</label>
       <input type="text" id="ativo-plataforma" value="${escAttr(ativo.plataforma || '')}" placeholder="Ex: Mercado Bitcoin, XP">
     </div>
     <div class="form-group">

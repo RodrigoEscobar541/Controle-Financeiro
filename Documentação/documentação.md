@@ -91,7 +91,7 @@ Transações financeiras (Mercado Pago).
 ```
 
 ### Coleção: `patrimonio`
-Ativos e investimentos. Campos exibidos na tabela como **Ativo**, **Tipo**
+Ativos e investimentos. Campos exibidos na tabela como **Ativo**, **Descrição**
 (campo `plataforma`), **Tipo de investimento** (campo `tipoInvestimento` —
 nome de uma divisão do gráfico pizza) e **Valor investido** (campo `valor`).
 Os nomes internos dos campos `plataforma`/`valor` foram mantidos; só os rótulos
@@ -99,7 +99,7 @@ da interface mudaram.
 ```
 {id_aleatorio}: {
   nomeDoAtivo:      "BTC",
-  plataforma:       "Mercado Bitcoin",   // exibido como "Tipo"
+  plataforma:       "Mercado Bitcoin",   // exibido como "Descrição"
   tipoInvestimento: "Criptomoeda",       // nome de uma divisão (patrimonioDivisoes)
   valor:            2180.00              // exibido como "Valor investido"
 }
