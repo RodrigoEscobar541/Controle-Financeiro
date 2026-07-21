@@ -99,6 +99,7 @@ function renderTabela() {
     <th class="col-total">Bella</th>
     <th class="col-total">Digo</th>
     <th class="col-total">Total</th>
+    <th class="col-total">Equilíbrio de contas</th>
   </tr>`;
 
   thead.querySelectorAll('.delete-col-btn').forEach(btn => {
@@ -115,7 +116,7 @@ function renderTabela() {
     const msg = Object.keys(meses).length === 0
       ? 'Nenhum mês cadastrado. Clique em "+ Mês" para começar.'
       : 'Nenhum mês no período selecionado. Ajuste o filtro ou adicione um mês.';
-    tbody.innerHTML = `<tr><td colspan="${colunasOrdem.length + 4}" class="empty-state">${msg}</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="${colunasOrdem.length + 5}" class="empty-state">${msg}</td></tr>`;
     document.getElementById('mes-atual-metade').textContent = 'R$ —';
     return;
   }
@@ -145,12 +146,26 @@ function renderTabela() {
       </td>`;
     }).join('');
 
+    const equilibrio        = Math.abs(total / 2 - totalBella);
+    const equilibrioPago    = meses[mesId]?.equilibrioPago === true;
+    const equilibrioPagante = meses[mesId]?.equilibrioPagante || '';
+    const eqTag = equilibrioPagante
+      ? `<span class="pagante-tag pagante-${equilibrioPagante.toLowerCase()}">${equilibrioPagante}</span>`
+      : '';
+
     return `<tr>
       <td><strong>${idToLabel(mesId)}</strong></td>
       ${tds}
       <td class="col-total" style="color:#AD1457">${fmtBRL(totalBella)}</td>
       <td class="col-total" style="color:#1565C0">${fmtBRL(totalDigo)}</td>
       <td class="col-total">${fmtBRL(total)}</td>
+      <td>
+        <div class="cell-equilibrio ${equilibrioPago ? 'pago' : ''}"
+             data-mes="${mesId}"
+             title="Clique: alternar responsável | Segure 1s: marcar/desmarcar como quitado">
+          ${fmtBRL(equilibrio)}<br><small>${eqTag}</small>
+        </div>
+      </td>
     </tr>`;
   }).join('');
 
@@ -182,6 +197,37 @@ function renderTabela() {
     cell.addEventListener('click', () => {
       if (longPressTriggered) { longPressTriggered = false; return; }
       editarCelula(cell.dataset.mes, cell.dataset.col);
+    });
+  });
+
+  tbody.querySelectorAll('.cell-equilibrio').forEach(cell => {
+    let pressTimer         = null;
+    let longPressTriggered = false;
+
+    const startPress = () => {
+      longPressTriggered = false;
+      pressTimer = setTimeout(() => {
+        longPressTriggered = true;
+        cell.classList.add('cell-pressing');
+        toggleEquilibrio(cell.dataset.mes);
+      }, 1000);
+    };
+
+    const cancelPress = () => {
+      clearTimeout(pressTimer);
+      cell.classList.remove('cell-pressing');
+    };
+
+    cell.addEventListener('mousedown',  startPress);
+    cell.addEventListener('mouseup',    cancelPress);
+    cell.addEventListener('mouseleave', cancelPress);
+    cell.addEventListener('touchstart', startPress,  { passive: true });
+    cell.addEventListener('touchend',   cancelPress);
+    cell.addEventListener('touchmove',  cancelPress, { passive: true });
+
+    cell.addEventListener('click', () => {
+      if (longPressTriggered) { longPressTriggered = false; return; }
+      ciclarEquilibrioPagante(cell.dataset.mes);
     });
   });
 
@@ -260,6 +306,31 @@ async function toggleStatus(mesId, colName) {
     }, { merge: true });
   } catch {
     showToast('Erro ao atualizar status.', 'error');
+  }
+}
+
+async function toggleEquilibrio(mesId) {
+  const atual = meses[mesId]?.equilibrioPago === true;
+  try {
+    await setDoc(doc(db, 'contas_casa', mesId), {
+      dataMes: mesIdParaLabel(mesId),
+      equilibrioPago: !atual
+    }, { merge: true });
+  } catch {
+    showToast('Erro ao atualizar equilíbrio.', 'error');
+  }
+}
+
+async function ciclarEquilibrioPagante(mesId) {
+  const atual   = meses[mesId]?.equilibrioPagante || '';
+  const proximo = atual === '' ? 'Bella' : atual === 'Bella' ? 'Digo' : '';
+  try {
+    await setDoc(doc(db, 'contas_casa', mesId), {
+      dataMes: mesIdParaLabel(mesId),
+      equilibrioPagante: proximo
+    }, { merge: true });
+  } catch {
+    showToast('Erro ao atualizar responsável.', 'error');
   }
 }
 

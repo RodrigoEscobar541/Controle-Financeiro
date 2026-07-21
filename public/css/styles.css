@@ -630,6 +630,24 @@ input, select, textarea { font-family: inherit; font-size: inherit; }
 
 .spreadsheet .col-total { font-weight: 700; }
 
+/* Coluna calculada "Equilíbrio de contas": só checável (segurar 1s → verde) */
+.spreadsheet .cell-equilibrio {
+  cursor: pointer;
+  user-select: none;
+  border-radius: 4px;
+  padding: 0.5rem 0.75rem;
+  font-weight: 700;
+  text-align: center;
+  transition: background 0.15s;
+}
+
+.spreadsheet .cell-equilibrio:hover { background: var(--primary-light); }
+
+.spreadsheet .cell-equilibrio.pago {
+  background: var(--success-light);
+  color: var(--success-text);
+}
+
 .table-wrapper {
   overflow-x: auto;
   padding: 0.5rem 1rem 1rem;
