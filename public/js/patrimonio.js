@@ -40,7 +40,8 @@ export function initPatrimonio() {
 function subscribeAtivos() {
   if (unsubAtivos) unsubAtivos();
   unsubAtivos = onSnapshot(collection(db, 'patrimonio'), snap => {
-    ativos = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    ativos = snap.docs.map(d => ({ id: d.id, ...d.data() }))
+                      .sort((a, b) => (a.nomeDoAtivo || '').localeCompare(b.nomeDoAtivo || '', 'pt-BR'));
     renderTabela();
     renderPizza();
   }, () => showToast('Erro ao carregar patrimônio.', 'error'));
