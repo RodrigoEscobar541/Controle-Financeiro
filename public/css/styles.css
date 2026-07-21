@@ -1277,3 +1277,101 @@ th[draggable]:active { cursor: grabbing; }
 }
 .status-bot.online  { color: var(--success); border-color: var(--success); }
 .status-bot.offline { color: var(--danger);  border-color: var(--danger); }
+
+/* ============================================================
+   GRÁFICO PIZZA — Patrimônio por tipo de investimento
+   ============================================================ */
+.pizza-wrap {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2rem;
+  padding: 0.5rem 0.25rem;
+}
+.pizza-chart {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 180px;
+}
+.pizza-chart .pizza-centro-val {
+  font-size: 15px;
+  font-weight: 700;
+  fill: var(--text);
+}
+.pizza-chart .pizza-centro-lbl {
+  font-size: 11px;
+  fill: var(--text-secondary);
+}
+.pizza-vazio {
+  width: 180px;
+  height: 180px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  border-radius: 50%;
+  border: 2px dashed var(--border);
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+  padding: 1rem;
+}
+.pizza-legenda {
+  flex: 1 1 240px;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+.pizza-item {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.35rem 0.25rem;
+  border-bottom: 1px solid var(--border);
+}
+.pizza-item:last-child { border-bottom: none; }
+.pizza-cor {
+  flex: 0 0 auto;
+  width: 14px;
+  height: 14px;
+  border-radius: 4px;
+}
+.pizza-pct {
+  flex: 0 0 auto;
+  min-width: 3.2em;
+  text-align: right;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+}
+.pizza-nome {
+  flex: 1 1 auto;
+  font-weight: 600;
+  color: var(--text);
+}
+.pizza-valor {
+  flex: 0 0 auto;
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+  white-space: nowrap;
+}
+.pizza-acoes {
+  flex: 0 0 auto;
+  display: inline-flex;
+  gap: 0.15rem;
+}
+.select-tipo-inv {
+  max-width: 200px;
+  padding: 0.3rem 0.5rem;
+  border: 1.5px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--text);
+}
+.select-tipo-inv:focus { border-color: var(--primary); outline: none; }
+
+@media (max-width: 640px) {
+  .pizza-wrap { gap: 1rem; justify-content: center; }
+  .select-tipo-inv { max-width: 140px; }
+}

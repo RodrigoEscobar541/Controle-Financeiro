@@ -343,22 +343,34 @@
           <thead>
             <tr>
               <th>Ativo</th>
-              <th>Plataforma</th>
-              <th class="text-right">Valor (R$)</th>
+              <th>Tipo</th>
+              <th>Tipo de investimento</th>
+              <th class="text-right">Valor investido (R$)</th>
               <th></th>
             </tr>
           </thead>
           <tbody id="patrimonio-tbody">
-            <tr><td colspan="4" class="loading">Carregando...</td></tr>
+            <tr><td colspan="5" class="loading">Carregando...</td></tr>
           </tbody>
           <tfoot>
             <tr>
-              <td colspan="2"><strong>Total</strong></td>
+              <td colspan="3"><strong>Total</strong></td>
               <td class="text-right"><strong id="patrimonio-total">R$ 0,00</strong></td>
               <td></td>
             </tr>
           </tfoot>
         </table>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <h3 class="card-title">Distribuição por tipo de investimento</h3>
+          <button id="btn-add-divisao" class="btn btn-primary">+ Nova divisão</button>
+        </div>
+        <div class="pizza-wrap">
+          <div id="pizza-chart" class="pizza-chart"></div>
+          <div id="pizza-legenda" class="pizza-legenda"></div>
+        </div>
       </div>
 
       <div class="notas-card">

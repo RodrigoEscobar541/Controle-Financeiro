@@ -81,9 +81,14 @@ banco/{id}
   descricao: "Salário"
 
 patrimonio/{id}
-  nomeDoAtivo: "BTC"
-  plataforma:  "Mercado Bitcoin"
-  valor:       2180.00
+  nomeDoAtivo:      "BTC"
+  plataforma:       "Mercado Bitcoin"   // exibido como "Tipo"
+  tipoInvestimento: "Criptomoeda"       // divisão do gráfico pizza (patrimonioDivisoes)
+  valor:            2180.00             // exibido como "Valor investido"
+
+patrimonioDivisoes/{id}                 // divisões do gráfico pizza
+  nome: "Criptomoeda"
+  cor:  "#EF6C00"
 
 distribuicao_mensal/{YYYY-MM}   // ex: "2026-06"
   dataMes:  "06-2026"
