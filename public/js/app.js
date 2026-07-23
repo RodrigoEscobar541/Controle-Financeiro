@@ -56,20 +56,101 @@ export function showToast(msg, type = '') {
   setTimeout(() => el.classList.add('hidden'), 3000);
 }
 
-// Modal global
+// ──────────────────────────────────────────────
+// VIEWPORT VISUAL (mobile)
+// ──────────────────────────────────────────────
+// No celular o teclado virtual NÃO encolhe o viewport de layout — só o visual.
+// Um overlay `position: fixed; inset: 0` continua com a altura da tela inteira
+// e o modal centralizado nela fica metade atrás do teclado. Aqui publicamos as
+// medidas do viewport VISUAL em variáveis CSS; o overlay se ancora nelas
+// (ver .modal-overlay em styles.css) e passa a ocupar só a área realmente
+// visível, acima do teclado.
+const vv = window.visualViewport;
+
+function sincronizarViewportVisual() {
+  if (!vv) return;
+  const raiz = document.documentElement;
+  const alturaLayout = window.innerHeight || vv.height;
+  raiz.style.setProperty('--vv-top',    `${Math.round(vv.offsetTop)}px`);
+  raiz.style.setProperty('--vv-left',   `${Math.round(vv.offsetLeft)}px`);
+  raiz.style.setProperty('--vv-width',  `${Math.round(vv.width)}px`);
+  raiz.style.setProperty('--vv-height', `${Math.round(vv.height)}px`);
+  raiz.style.setProperty(
+    '--vv-bottom',
+    `${Math.max(0, Math.round(alturaLayout - vv.offsetTop - vv.height))}px`
+  );
+}
+
+if (vv) {
+  vv.addEventListener('resize', sincronizarViewportVisual);
+  vv.addEventListener('scroll', sincronizarViewportVisual);
+  window.addEventListener('orientationchange', () => setTimeout(sincronizarViewportVisual, 250));
+  sincronizarViewportVisual();
+}
+
+// ──────────────────────────────────────────────
+// MODAL GLOBAL
+// ──────────────────────────────────────────────
 let _modalConfirm = null;
+let _scrollTravado = 0;
+
+const modalOverlay = document.getElementById('modal-overlay');
+const modalEl      = modalOverlay?.querySelector('.modal');
+
+function travarFundo() {
+  // Se um modal abrir outro, a posição real já está congelada — não recapturar
+  // (com o body fixo, window.scrollY é 0 e a página voltaria ao topo ao fechar).
+  if (document.body.classList.contains('modal-open')) return;
+  _scrollTravado = window.scrollY || document.documentElement.scrollTop || 0;
+  // Travar o body some com a barra de rolagem no desktop; compensar a largura
+  // dela evita o "pulo" horizontal do conteúdo ao abrir o modal.
+  const larguraBarra = window.innerWidth - document.documentElement.clientWidth;
+  if (larguraBarra > 0) document.body.style.paddingRight = `${larguraBarra}px`;
+  document.body.style.top = `-${_scrollTravado}px`;
+  document.body.classList.add('modal-open');
+}
+
+function destravarFundo() {
+  document.body.classList.remove('modal-open');
+  document.body.style.top = '';
+  document.body.style.paddingRight = '';
+  window.scrollTo(0, _scrollTravado);
+}
+
+// Campos focáveis do modal, na ordem de tabulação.
+function focaveisDoModal() {
+  return [...modalEl.querySelectorAll(
+    'input:not([type="hidden"]):not([disabled]), select:not([disabled]), textarea:not([disabled]), button:not([disabled]), [href]'
+  )].filter(el => el.offsetParent !== null);
+}
 
 export function openModal(title, bodyHTML, onConfirm, confirmLabel = 'Confirmar') {
   document.getElementById('modal-title').textContent = title;
   document.getElementById('modal-body').innerHTML = bodyHTML;
   document.getElementById('modal-confirm').textContent = confirmLabel;
-  document.getElementById('modal-overlay').classList.remove('hidden');
+  modalOverlay.classList.remove('hidden');
   _modalConfirm = onConfirm;
+
+  travarFundo();
+  modalOverlay.scrollTop = 0;
+  document.getElementById('modal-body').scrollTop = 0;
+
+  // Foca o primeiro campo do formulário e já seleciona o conteúdo: no celular
+  // isso transforma "editar um valor" em um toque só (abre o modal, o teclado
+  // sobe e o valor antigo é substituído ao digitar).
+  const primeiro = modalEl.querySelector('#modal-body input:not([type="hidden"]), #modal-body select, #modal-body textarea');
+  if (primeiro) {
+    primeiro.focus({ preventScroll: true });
+    if (typeof primeiro.select === 'function' && /^(text|number|search|tel|url|email|password)$/.test(primeiro.type || '')) {
+      primeiro.select();
+    }
+  }
 }
 
 export function closeModal() {
-  document.getElementById('modal-overlay').classList.add('hidden');
+  modalOverlay.classList.add('hidden');
   _modalConfirm = null;
+  destravarFundo();
 }
 
 document.getElementById('modal-close').addEventListener('click', closeModal);
@@ -78,8 +159,41 @@ document.getElementById('modal-confirm').addEventListener('click', () => {
   if (_modalConfirm) _modalConfirm();
   closeModal();
 });
-document.getElementById('modal-overlay').addEventListener('click', e => {
-  if (e.target === document.getElementById('modal-overlay')) closeModal();
+modalOverlay.addEventListener('click', e => {
+  if (e.target === modalOverlay) closeModal();
+});
+
+// Ao focar um campo, garante que ele fique visível acima do teclado. O ajuste
+// do viewport visual é assíncrono, daí o pequeno atraso.
+modalEl.addEventListener('focusin', e => {
+  if (!e.target.matches('input, select, textarea')) return;
+  setTimeout(() => e.target.scrollIntoView({ block: 'nearest', behavior: 'smooth' }), 300);
+});
+
+document.addEventListener('keydown', e => {
+  if (modalOverlay.classList.contains('hidden')) return;
+
+  if (e.key === 'Escape') { closeModal(); return; }
+
+  // Enter num campo de uma linha confirma (não em textarea, onde quebra linha).
+  if (e.key === 'Enter' && e.target.matches('input:not([type="button"]):not([type="submit"])')) {
+    e.preventDefault();
+    document.getElementById('modal-confirm').click();
+    return;
+  }
+
+  // Mantém o foco preso dentro do modal enquanto ele está aberto.
+  if (e.key === 'Tab') {
+    const campos = focaveisDoModal();
+    if (campos.length === 0) return;
+    const primeiro = campos[0];
+    const ultimo   = campos[campos.length - 1];
+    if (e.shiftKey && document.activeElement === primeiro) {
+      e.preventDefault(); ultimo.focus();
+    } else if (!e.shiftKey && document.activeElement === ultimo) {
+      e.preventDefault(); primeiro.focus();
+    }
+  }
 });
 
 // ──────────────────────────────────────────────

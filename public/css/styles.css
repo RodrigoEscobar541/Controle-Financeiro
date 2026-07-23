@@ -24,6 +24,19 @@
   --radius: 10px;
   --sidebar-width: 220px;
   --topbar-height: 64px;
+
+  /* Viewport VISUAL (área realmente visível — encolhe quando o teclado do
+     celular abre). Preenchidas por JS em app.js; os fallbacks valem enquanto
+     o script não roda ou quando a API visualViewport não existe. */
+  --vv-top: 0px;
+  --vv-left: 0px;
+  --vv-width: 100vw;
+  --vv-height: 100vh;
+  --vv-bottom: 0px;   /* altura ocupada pelo teclado (0 quando fechado) */
+}
+
+@supports (height: 100dvh) {
+  :root { --vv-height: 100dvh; }
 }
 
 /* ============================================================
@@ -50,9 +63,11 @@ input, select, textarea { font-family: inherit; font-size: inherit; }
    ============================================================ */
 .login-page {
   min-height: 100vh;
+  min-height: 100dvh;
   display: flex;
   align-items: center;
   justify-content: center;
+  padding: 1rem 0;
   background: linear-gradient(135deg, #0D47A1 0%, #1A1F36 60%, #0D1B2A 100%);
 }
 
@@ -128,14 +143,19 @@ input, select, textarea { font-family: inherit; font-size: inherit; }
   background: #fff;
 }
 
-.form-hint {
+.form-hint,
+.form-group small {
   display: block;
   margin-top: 0.35rem;
   color: var(--text-secondary);
   font-size: 0.75rem;
+  line-height: 1.4;
   text-transform: none;
   letter-spacing: normal;
 }
+
+/* Último campo do modal não empurra espaço extra contra o rodapé */
+.modal-body .form-group:last-child { margin-bottom: 0; }
 
 .form-inline {
   display: flex;
@@ -282,7 +302,18 @@ input, select, textarea { font-family: inherit; font-size: inherit; }
 .app-body {
   display: flex;
   min-height: 100vh;
+  min-height: 100dvh;
   background: var(--bg);
+}
+
+/* Trava a rolagem do fundo enquanto um modal está aberto (aplicada por JS,
+   que congela a posição em `top` e a restaura ao fechar — sem isso o iOS rola
+   a página atrás do modal e ela "pula" quando o modal fecha). */
+body.modal-open {
+  position: fixed;
+  left: 0;
+  width: 100%;
+  overflow: hidden;
 }
 
 /* --- SIDEBAR --- */
@@ -294,8 +325,10 @@ input, select, textarea { font-family: inherit; font-size: inherit; }
   position: fixed;
   top: 0; left: 0;
   height: 100vh;
+  height: 100dvh;
   z-index: 100;
   overflow-y: auto;
+  overscroll-behavior: contain;
 }
 
 .sidebar-header {
@@ -394,7 +427,9 @@ input, select, textarea { font-family: inherit; font-size: inherit; }
 .main-content {
   margin-left: var(--sidebar-width);
   flex: 1;
+  min-width: 0;          /* impede que uma tabela larga estoure o layout */
   min-height: 100vh;
+  min-height: 100dvh;
   display: flex;
   flex-direction: column;
 }
@@ -418,6 +453,10 @@ input, select, textarea { font-family: inherit; font-size: inherit; }
   font-size: 1.2rem;
   font-weight: 700;
   color: var(--text);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .top-bar-right {
@@ -787,14 +826,31 @@ input, select, textarea { font-family: inherit; font-size: inherit; }
 
 /* ============================================================
    MODAL
+
+   O overlay é ancorado no VIEWPORT VISUAL (variáveis --vv-*), não no viewport
+   de layout. Isso é o que resolve o problema no celular: quando o teclado
+   virtual abre, o navegador NÃO encolhe o viewport de layout — só o visual.
+   Um overlay `inset: 0` continuaria com a altura da tela inteira e o modal
+   centralizado nela ficaria metade atrás do teclado.
+
+   Regras de ouro aplicadas aqui:
+   - overlay rola (`overflow-y: auto`) → modal alto nunca fica inacessível;
+   - `margin: auto` no modal centraliza SEM cortar o topo quando não cabe;
+   - header/footer fixos, corpo rolável → o botão Salvar é sempre alcançável.
    ============================================================ */
 .modal-overlay {
   position: fixed;
-  inset: 0;
+  top: var(--vv-top, 0px);
+  left: var(--vv-left, 0px);
+  width: var(--vv-width, 100vw);
+  height: var(--vv-height, 100vh);
   background: rgba(10,15,40,0.55);
   display: flex;
-  align-items: center;
   justify-content: center;
+  padding: 1.25rem;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
   z-index: 1000;
   backdrop-filter: blur(2px);
 }
@@ -806,6 +862,10 @@ input, select, textarea { font-family: inherit; font-size: inherit; }
   border-radius: 14px;
   width: 100%;
   max-width: 460px;
+  max-height: 100%;
+  margin: auto;          /* centraliza sem cortar o topo em modal alto */
+  display: flex;
+  flex-direction: column;
   box-shadow: var(--shadow-md);
   animation: modalIn 0.2s ease;
 }
@@ -819,11 +879,18 @@ input, select, textarea { font-family: inherit; font-size: inherit; }
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 0.5rem;
+  flex: 0 0 auto;
   padding: 1.125rem 1.25rem;
   border-bottom: 1px solid var(--border);
 }
 
-.modal-title { font-size: 1rem; font-weight: 700; }
+.modal-title {
+  font-size: 1rem;
+  font-weight: 700;
+  min-width: 0;          /* permite o título quebrar em vez de esticar o modal */
+  overflow-wrap: anywhere;
+}
 
 .modal-close {
   background: none;
@@ -832,15 +899,23 @@ input, select, textarea { font-family: inherit; font-size: inherit; }
   color: var(--text-secondary);
   line-height: 1;
   padding: 0 0.25rem;
+  flex-shrink: 0;
 }
 .modal-close:hover { color: var(--danger); }
 
-.modal-body { padding: 1.25rem; }
+.modal-body {
+  padding: 1.25rem;
+  flex: 1 1 auto;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
 
 .modal-footer {
   display: flex;
   gap: 0.75rem;
   justify-content: flex-end;
+  flex: 0 0 auto;
   padding: 0.875rem 1.25rem;
   border-top: 1px solid var(--border);
 }
@@ -850,7 +925,9 @@ input, select, textarea { font-family: inherit; font-size: inherit; }
    ============================================================ */
 .toast {
   position: fixed;
-  bottom: 1.5rem;
+  /* Ancorado ao rodapé do viewport VISUAL: com o teclado aberto no celular o
+     toast continua visível em vez de aparecer atrás dele. */
+  bottom: calc(var(--vv-bottom, 0px) + 1.5rem);
   right: 1.5rem;
   background: #1A1F36;
   color: #fff;
@@ -871,6 +948,17 @@ input, select, textarea { font-family: inherit; font-size: inherit; }
 @keyframes toastIn {
   from { opacity: 0; transform: translateY(10px); }
   to   { opacity: 1; transform: translateY(0); }
+}
+
+/* Entrada do modal em formato bottom sheet (mobile) */
+@keyframes sheetIn {
+  from { opacity: 0; transform: translateY(100%); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* Respeita quem desligou animações no sistema */
+@media (prefers-reduced-motion: reduce) {
+  .modal, .toast, .sidebar { animation: none !important; transition: none !important; }
 }
 
 /* ============================================================
@@ -1086,8 +1174,9 @@ th[draggable]:active { cursor: grabbing; }
   /* HAMBURGUER */
   .menu-toggle { display: inline-flex; }
 
-  /* BACKDROP */
+  /* BACKDROP — com o menu aberto o fundo não rola junto */
   body.sidebar-open .sidebar-backdrop { display: block; }
+  body.sidebar-open { overflow: hidden; }
 
   /* SIDEBAR — drawer oculto, desliza ao abrir */
   .sidebar {
@@ -1162,16 +1251,36 @@ th[draggable]:active { cursor: grabbing; }
     flex-wrap: wrap;
     gap: 0.5rem;
     padding: 0.875rem 1rem;
+    /* o card rola na horizontal quando a tabela é larga: o header fica parado
+       para os botões continuarem alcançáveis */
+    position: sticky;
+    left: 0;
   }
   .card-actions {
     flex-wrap: wrap;
     gap: 0.4rem;
     width: 100%;
   }
+  /* Botões do header dividem a linha em vez de sobrar meia coluna vazia */
+  .card-actions > .btn { flex: 1 1 8rem; justify-content: center; }
 
-  /* PERIOD FILTER */
-  .period-filter { flex-wrap: wrap; }
-  .month-picker { min-width: 108px; }
+  /* PERIOD FILTER — ocupa a linha inteira e os dois seletores dividem o espaço */
+  .period-filter {
+    flex-wrap: wrap;
+    width: 100%;
+    justify-content: center;
+  }
+  .period-filter-label { width: 100%; text-align: center; margin-right: 0; }
+  .month-picker { min-width: 0; flex: 1 1 7rem; text-align: center; }
+  .mes-atual-badge { width: 100%; }
+
+  /* TABELAS — mais densas para caber sem rolagem horizontal na maioria dos casos */
+  .data-table { font-size: 0.8125rem; }
+  .data-table thead th { padding: 0.5rem 0.625rem; }
+  .data-table tbody td,
+  .data-table tfoot td { padding: 0.55rem 0.625rem; }
+  .spreadsheet .cell-data,
+  .spreadsheet .cell-equilibrio { padding: 0.6rem 0.5rem; min-width: 72px; }
 
   /* FORMULÁRIOS — empilhar em coluna */
   .form-inline {
@@ -1215,18 +1324,60 @@ th[draggable]:active { cursor: grabbing; }
   .dd-data-group { max-width: unset; width: 100%; }
   .dd-header-controls { flex-wrap: wrap; gap: 0.4rem; }
 
-  /* MODAL */
+  /* MODAL — vira "bottom sheet": colado no rodapé do viewport VISUAL, logo
+     acima do teclado. É a posição que o polegar alcança e a que não some
+     quando o teclado abre. */
+  .modal-overlay {
+    padding: 0;
+    align-items: flex-end;
+  }
   .modal {
-    max-width: calc(100vw - 2rem);
-    margin: 0 1rem;
-    border-radius: 16px;
+    max-width: 100%;
+    width: 100%;
+    max-height: 100%;
+    margin: auto 0 0;              /* empurra para o rodapé */
+    border-radius: 18px 18px 0 0;
+    animation: sheetIn 0.22s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  .modal-header {
+    padding: 1rem 1rem 0.875rem;
+    /* "puxador" visual do sheet */
+    position: relative;
+  }
+  .modal-header::before {
+    content: '';
+    position: absolute;
+    top: 0.375rem;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 2.25rem;
+    height: 4px;
+    border-radius: 2px;
+    background: var(--border);
+  }
+  .modal-title { font-size: 1.0625rem; }
+  .modal-close {
+    font-size: 1.6rem;
+    min-width: 40px;
+    min-height: 40px;
+  }
+  .modal-body { padding: 1rem; }
+  .modal-footer {
+    padding: 0.75rem 1rem calc(0.75rem + env(safe-area-inset-bottom, 0px));
+    gap: 0.625rem;
+  }
+  /* Botões do rodapé dividem a largura — alvo de toque generoso */
+  .modal-footer .btn {
+    flex: 1;
+    justify-content: center;
+    min-height: 48px;
   }
 
   /* TOAST */
   .toast {
     left: 1rem;
     right: 1rem;
-    bottom: 1rem;
+    bottom: calc(var(--vv-bottom, 0px) + 1rem);
     max-width: unset;
     text-align: center;
   }
@@ -1248,6 +1399,30 @@ th[draggable]:active { cursor: grabbing; }
   .mes-atual-badge { text-align: center; }
 }
 
+/* Celulares em pé (≤ 480px) — o seletor de mês precisa da linha inteira:
+   com 16px de fonte (obrigatório para o iOS não dar zoom) um rótulo como
+   "fevereiro de 2026" não cabe ao lado do outro e o texto fica cortado pelo
+   ícone do calendário. */
+@media (max-width: 480px) {
+  .period-filter,
+  .dd-header-controls {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.35rem;
+  }
+  .period-arrow {
+    transform: rotate(90deg);   /* "→" vira "↓" no empilhamento vertical */
+    align-self: center;
+    line-height: 1;
+  }
+  .month-picker {
+    flex: none;
+    width: 100%;
+    padding: 0.4rem 0.5rem;
+  }
+  .dd-filter-check { justify-content: center; }
+}
+
 /* Telefones pequenos (≤ 420px) */
 @media (max-width: 420px) {
   .content-section { padding: 0.625rem; }
@@ -1256,8 +1431,8 @@ th[draggable]:active { cursor: grabbing; }
   .stat-icon { font-size: 1.625rem; }
   .page-title { font-size: 0.9375rem; }
   .btn { padding: 0.625rem 1rem; }
-  .modal { margin: 0 0.5rem; max-width: calc(100vw - 1rem); }
-  .toast { left: 0.5rem; right: 0.5rem; bottom: 0.5rem; }
+  .modal-title { font-size: 1rem; }
+  .toast { left: 0.5rem; right: 0.5rem; bottom: calc(var(--vv-bottom, 0px) + 0.5rem); }
   .login-card { padding: 1.75rem 1.25rem; }
 }
 
@@ -1374,4 +1549,21 @@ th[draggable]:active { cursor: grabbing; }
 @media (max-width: 640px) {
   .pizza-wrap { gap: 1rem; justify-content: center; }
   .select-tipo-inv { max-width: 140px; }
+}
+
+/* ============================================================
+   CAMPOS EM TELAS DE TOQUE  —  precisa ficar no FIM do arquivo
+   ============================================================
+   Em tela de toque, QUALQUER campo precisa ter no mínimo 16px: abaixo disso o
+   Safari do iPhone/iPad aplica zoom automático ao focar e a tela inteira sai
+   do lugar (e o usuário fica sem conseguir voltar sozinho).
+   Mora no fim do arquivo de propósito: as regras que ele sobrescreve
+   (.form-group input, .month-picker, …) têm a mesma especificidade, então quem
+   vence é a última declarada. */
+@media (pointer: coarse) {
+  input, select, textarea,
+  .form-group input, .form-group select, .form-group textarea,
+  .month-picker, .select-tipo-inv, .notas-textarea {
+    font-size: 16px;
+  }
 }
