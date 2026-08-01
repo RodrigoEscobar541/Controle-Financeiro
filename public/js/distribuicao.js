@@ -8,13 +8,18 @@
  *
  *   Coleção: config
  *   Documento "distribuicao_colunas":
- *     { colunas: ["HBO","Netflix",...] }   ← array define a ordem
+ *     { colunas: ["HBO","Netflix",...] }   ← array define a ordem e a visibilidade
+ *
+ *   Remover uma coluna apenas a tira desse array (deixa de aparecer na tabela).
+ *   Os valores já lançados em distribuicao_mensal.*.colunas permanecem no
+ *   banco para histórico e voltam a aparecer se a coluna for recriada com o
+ *   mesmo nome.
  */
 
 import { db } from './firebase-config.js';
 import { fmtBRL, mesAtualId, idToLabel, showToast, openModal } from './app.js';
 import {
-  collection, doc, setDoc, updateDoc, deleteField, onSnapshot
+  collection, doc, setDoc, onSnapshot
 } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
 
 let colunas    = [];
@@ -318,14 +323,11 @@ function adicionarColuna() {
 function removerColuna(nome) {
   openModal(
     `Remover coluna "${nome}"`,
-    `<p>Isso removerá a coluna <strong>${nome}</strong> de todos os meses. Os valores serão perdidos.</p>`,
+    `<p>A coluna <strong>${nome}</strong> deixará de aparecer na tabela. Os valores já lançados são mantidos no banco de dados para consultas futuras.</p>`,
     async () => {
       try {
         await setDoc(doc(db, 'config', 'distribuicao_colunas'), { colunas: colunas.filter(c => c !== nome) });
-        for (const mesId of Object.keys(meses)) {
-          await updateDoc(doc(db, 'distribuicao_mensal', mesId), { [`colunas.${nome}`]: deleteField() });
-        }
-        showToast(`Coluna "${nome}" removida.`, 'success');
+        showToast(`Coluna "${nome}" removida da visualização.`, 'success');
       } catch {
         showToast('Erro ao remover coluna.', 'error');
       }
