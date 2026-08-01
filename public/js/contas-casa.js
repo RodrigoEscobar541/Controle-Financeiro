@@ -9,6 +9,11 @@
  *   Coleção: config
  *   Documento "contas_casa_colunas":
  *     { colunas: { "Mercado": { defaultPagante: "Digo" }, ... }, ordem: ["Mercado","Luz",...] }
+ *
+ *   Coluna "Equilíbrio de contas": o responsável exibido é calculado
+ *   automaticamente comparando o total gasto por Bella x Digo no mês —
+ *   quem gastou menos é quem aparece (é quem deve a diferença). Só o
+ *   status de quitado (equilibrioPago) é controlado manualmente pelo usuário.
  */
 
 import { db } from './firebase-config.js';
@@ -148,7 +153,7 @@ function renderTabela() {
 
     const equilibrio        = Math.abs(total / 2 - totalBella);
     const equilibrioPago    = meses[mesId]?.equilibrioPago === true;
-    const equilibrioPagante = meses[mesId]?.equilibrioPagante || '';
+    const equilibrioPagante = totalBella < totalDigo ? 'Bella' : totalDigo < totalBella ? 'Digo' : '';
     const eqTag = equilibrioPagante
       ? `<span class="pagante-tag pagante-${equilibrioPagante.toLowerCase()}">${equilibrioPagante}</span>`
       : '';
@@ -162,7 +167,7 @@ function renderTabela() {
       <td>
         <div class="cell-equilibrio ${equilibrioPago ? 'pago' : ''}"
              data-mes="${mesId}"
-             title="Clique: alternar responsável | Segure 1s: marcar/desmarcar como quitado">
+             title="Quem gastou menos entre Bella e Digo | Segure 1s: marcar/desmarcar como quitado">
           ${fmtBRL(equilibrio)}<br><small>${eqTag}</small>
         </div>
       </td>
@@ -201,13 +206,10 @@ function renderTabela() {
   });
 
   tbody.querySelectorAll('.cell-equilibrio').forEach(cell => {
-    let pressTimer         = null;
-    let longPressTriggered = false;
+    let pressTimer = null;
 
     const startPress = () => {
-      longPressTriggered = false;
       pressTimer = setTimeout(() => {
-        longPressTriggered = true;
         cell.classList.add('cell-pressing');
         toggleEquilibrio(cell.dataset.mes);
       }, 1000);
@@ -224,11 +226,6 @@ function renderTabela() {
     cell.addEventListener('touchstart', startPress,  { passive: true });
     cell.addEventListener('touchend',   cancelPress);
     cell.addEventListener('touchmove',  cancelPress, { passive: true });
-
-    cell.addEventListener('click', () => {
-      if (longPressTriggered) { longPressTriggered = false; return; }
-      ciclarEquilibrioPagante(cell.dataset.mes);
-    });
   });
 
   const mesAtual = meses[mesAtualId()];
@@ -318,19 +315,6 @@ async function toggleEquilibrio(mesId) {
     }, { merge: true });
   } catch {
     showToast('Erro ao atualizar equilíbrio.', 'error');
-  }
-}
-
-async function ciclarEquilibrioPagante(mesId) {
-  const atual   = meses[mesId]?.equilibrioPagante || '';
-  const proximo = atual === '' ? 'Bella' : atual === 'Bella' ? 'Digo' : '';
-  try {
-    await setDoc(doc(db, 'contas_casa', mesId), {
-      dataMes: mesIdParaLabel(mesId),
-      equilibrioPagante: proximo
-    }, { merge: true });
-  } catch {
-    showToast('Erro ao atualizar responsável.', 'error');
   }
 }
 
