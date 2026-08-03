@@ -1,0 +1,47 @@
+name: Migração Focus/Face (one-off)
+
+# Roda o script Bot Render/scripts/migrar-focus-face.js sob demanda, disparado
+# manualmente pela aba "Actions" do GitHub (funciona pelo celular, sem precisar
+# de terminal). Reaproveita o secret FIREBASE_SERVICE_ACCOUNT já configurado
+# neste repositório (usado hoje pelo deploy do Firebase Hosting).
+#
+# Passo 1 (padrão): roda sem apagar nada — só cria/atualiza as coleções novas
+#                   (focus, face) a partir das 8 coleções antigas.
+# Passo 2 (opcional, depois de confirmar no site/bot que está tudo certo):
+#                   marque "apagar_antigas" e rode de novo para limpar as
+#                   coleções antigas.
+
+on:
+  workflow_dispatch:
+    inputs:
+      apagar_antigas:
+        description: 'Apagar coleções antigas? Só marque depois de confirmar que a migração está correta.'
+        type: boolean
+        default: false
+
+jobs:
+  migrar:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout do repositório
+        uses: actions/checkout@v4
+
+      - name: Configurar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Instalar dependências do bot
+        working-directory: Bot Render
+        run: npm install --omit=dev
+
+      - name: Rodar migração
+        working-directory: Bot Render
+        env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+        run: |
+          if [ "${{ inputs.apagar_antigas }}" = "true" ]; then
+            node scripts/migrar-focus-face.js --apagar-antigas
+          else
+            node scripts/migrar-focus-face.js
+          fi
