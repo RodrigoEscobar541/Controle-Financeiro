@@ -95,6 +95,7 @@ function renderTabela() {
     const tag = pag ? `<span class="pagante-tag pagante-${pag.toLowerCase()}">${pag}</span>` : '';
     return `<th draggable="true" data-col="${nome}">
       <span class="col-name">${nome}${tag}</span>
+      <span class="edit-col-btn" data-col="${nome}" title="Editar responsável padrão" draggable="false">✏️</span>
       <span class="delete-col-btn" data-col="${nome}" title="Remover" draggable="false">✕</span>
     </th>`;
   }).join('');
@@ -109,6 +110,10 @@ function renderTabela() {
 
   thead.querySelectorAll('.delete-col-btn').forEach(btn => {
     btn.addEventListener('click', e => { e.stopPropagation(); removerColuna(btn.dataset.col); });
+  });
+
+  thead.querySelectorAll('.edit-col-btn').forEach(btn => {
+    btn.addEventListener('click', e => { e.stopPropagation(); editarResponsavelPadrao(btn.dataset.col); });
   });
 
   setupColDrag(thead);
@@ -422,6 +427,44 @@ function adicionarColuna() {
       }
     },
     'Adicionar'
+  );
+}
+
+function editarResponsavelPadrao(nome) {
+  const atual = colunasConfig[nome]?.defaultPagante || 'Digo';
+  openModal(
+    `Editar responsável — ${nome}`,
+    `<div class="form-group">
+       <label>Responsável padrão</label>
+       <select id="edit-responsavel-padrao-casa" class="form-control">
+         <option value="Digo"  ${atual === 'Digo'  ? 'selected' : ''}>Digo</option>
+         <option value="Bella" ${atual === 'Bella' ? 'selected' : ''}>Bella</option>
+       </select>
+     </div>
+     <p class="form-hint">Atualiza o responsável em todas as células desta coluna que
+       ainda não estão marcadas como pagas. Células já pagas (verdes) mantêm o
+       responsável que está registrado nelas.</p>`,
+    async () => {
+      const novoPagante = document.getElementById('edit-responsavel-padrao-casa').value;
+      try {
+        const novoConfig = { ...colunasConfig, [nome]: { ...colunasConfig[nome], defaultPagante: novoPagante } };
+        await setDoc(doc(db, 'config', 'contas_casa_colunas'), { colunas: novoConfig, ordem: colunasOrdem });
+
+        for (const mesId of Object.keys(meses)) {
+          const cols = meses[mesId]?.colunas || {};
+          const cell = cols[nome];
+          if (cell && cell.status !== 'Pago' && cell.pagante !== novoPagante) {
+            await setDoc(doc(db, 'contas_casa', mesId), {
+              colunas: { ...cols, [nome]: { ...cell, pagante: novoPagante } }
+            }, { merge: true });
+          }
+        }
+        showToast(`Responsável padrão de "${nome}" atualizado!`, 'success');
+      } catch {
+        showToast('Erro ao atualizar responsável.', 'error');
+      }
+    },
+    'Salvar'
   );
 }
 
