@@ -1,34 +1,38 @@
 /**
- * Carro
+ * Face
  *
  * Estrutura Firestore:
- *   carro_afazer         { prioridade, descricao, valor }
- *     prioridade é interno e não aparece na UI — só define ordem de registro
- *     (item novo entra com prioridade = maior atual + 1, ou seja, no fim da fila).
- *   carro_feitos         { data: "YYYY-MM-DD", descricao, valor }
- *   carro_manutencao     { descricao, data: "YYYY-MM-DD", kmUltimaTroca, kmProximaTroca, valor }
- *   carro_abastecimento  { data: "YYYY-MM-DD", km, correcao, litros, valorPago (preço por litro, não o total), tipoCombustivel }
+ *   Coleção: face/{id}
+ *     Um documento por registro, diferenciado pelo campo `tipo`:
+ *       tipo:'afazer'        { prioridade, descricao, valor }
+ *       tipo:'feito'         { data: "YYYY-MM-DD", descricao, valor }
+ *       tipo:'manutencao'    { descricao, data: "YYYY-MM-DD", kmUltimaTroca, kmProximaTroca, valor }
+ *       tipo:'abastecimento' { data: "YYYY-MM-DD", km, correcao, litros, valorPago (preço por litro, não o total), tipoCombustivel }
+ *
+ *   prioridade (só em tipo:'afazer') é interno e não aparece na UI — só define
+ *   ordem de registro (item novo entra com prioridade = maior atual + 1).
  */
 
 import { db } from './firebase-config.js';
 import { fmtBRL, fmtDate, showToast, openModal } from './app.js';
 import { subscribeTiposCombustivel, adicionarTipoCombustivel, abrirModalGerenciarTipos } from './combustivel-tipos.js';
 import {
-  collection, query, orderBy, where, onSnapshot,
+  collection, onSnapshot,
   addDoc, deleteDoc, updateDoc, doc
 } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
 
-let afazer               = [];
-let feitos               = [];
-let manutencao           = [];
-let abastecimento        = [];
-let tiposCombustivel     = [];
-let unsubs               = [];
-let feitosVisiveis       = 5;
+let docsRaw               = [];
+let afazer                = [];
+let feitos                = [];
+let manutencao            = [];
+let abastecimento         = [];
+let tiposCombustivel      = [];
+let unsubDados            = null;
+let feitosVisiveis        = 5;
 let abastecimentoVisiveis = 1;
-let mostrarAntigos       = false;
+let mostrarAntigos        = false;
 
-const LS_VALOR_PAGO = 'tf_valorPago_carro';
+const LS_VALOR_PAGO = 'tf_valorPago_face';
 
 function corteUmAno() {
   const d = new Date();
@@ -36,54 +40,56 @@ function corteUmAno() {
   return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
 }
 
-export function initCarro() {
-  document.getElementById('btn-add-afazer').addEventListener('click',     () => abrirModalAfazer());
-  document.getElementById('btn-add-feito').addEventListener('click',      () => abrirModalFeito());
-  document.getElementById('btn-add-manutencao').addEventListener('click', () => abrirModalManutencao());
-  document.getElementById('btn-add-abastecimento').addEventListener('click', () => abrirModalAbastecimento());
-  document.getElementById('btn-tipos-combustivel').addEventListener('click', () => abrirModalGerenciarTipos(tiposCombustivel));
+export function initFace() {
+  document.getElementById('btn-add-afazer-face').addEventListener('click',     () => abrirModalAfazer());
+  document.getElementById('btn-add-feito-face').addEventListener('click',      () => abrirModalFeito());
+  document.getElementById('btn-add-manutencao-face').addEventListener('click', () => abrirModalManutencao());
+  document.getElementById('btn-add-abastecimento-face').addEventListener('click', () => abrirModalAbastecimento());
+  document.getElementById('btn-tipos-combustivel-face').addEventListener('click', () => abrirModalGerenciarTipos(tiposCombustivel));
   subscribeTiposCombustivel(lista => { tiposCombustivel = lista; });
   subscribeAll();
 }
 
 function subscribeAll() {
-  unsubs.forEach(u => u());
-  unsubs = [];
+  if (unsubDados) unsubDados();
+  unsubDados = onSnapshot(
+    collection(db, 'face'),
+    snap => {
+      docsRaw = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      recalcular();
+    },
+    () => showToast('Erro ao carregar dados do Face.', 'error')
+  );
+}
 
-  unsubs.push(onSnapshot(
-    query(collection(db, 'carro_afazer'), orderBy('prioridade', 'asc')),
-    snap => { afazer = snap.docs.map(d => ({ id: d.id, ...d.data() })); renderAfazer(); },
-    () => showToast('Erro ao carregar A Fazer.', 'error')
-  ));
+function recalcular() {
+  afazer = docsRaw
+    .filter(d => d.tipo === 'afazer')
+    .sort((a, b) => (parseFloat(a.prioridade) || 0) - (parseFloat(b.prioridade) || 0));
 
-  const feitosConstraints = [];
-  if (!mostrarAntigos) feitosConstraints.push(where('data', '>=', corteUmAno()));
-  feitosConstraints.push(orderBy('data', 'desc'));
+  const corte = mostrarAntigos ? null : corteUmAno();
+  feitos = docsRaw
+    .filter(d => d.tipo === 'feito')
+    .filter(d => !corte || (d.data || '') >= corte)
+    .sort((a, b) => String(b.data || '').localeCompare(String(a.data || '')));
 
-  unsubs.push(onSnapshot(
-    query(collection(db, 'carro_feitos'), ...feitosConstraints),
-    snap => { feitos = snap.docs.map(d => ({ id: d.id, ...d.data() })); renderFeitos(); },
-    () => showToast('Erro ao carregar Feitos.', 'error')
-  ));
+  manutencao = docsRaw.filter(d => d.tipo === 'manutencao');
 
-  unsubs.push(onSnapshot(
-    collection(db, 'carro_manutencao'),
-    snap => { manutencao = snap.docs.map(d => ({ id: d.id, ...d.data() })); renderManutencao(); },
-    () => showToast('Erro ao carregar Manutenção.', 'error')
-  ));
+  abastecimento = docsRaw
+    .filter(d => d.tipo === 'abastecimento')
+    .sort((a, b) => String(b.data || '').localeCompare(String(a.data || '')));
 
-  unsubs.push(onSnapshot(
-    query(collection(db, 'carro_abastecimento'), orderBy('data', 'desc')),
-    snap => { abastecimento = snap.docs.map(d => ({ id: d.id, ...d.data() })); renderAbastecimento(); },
-    () => showToast('Erro ao carregar Abastecimento.', 'error')
-  ));
+  renderAfazer();
+  renderFeitos();
+  renderManutencao();
+  renderAbastecimento();
 }
 
 // ── A FAZER ───────────────────────────────────────────────────────────────────
 
 function renderAfazer() {
-  const tbody   = document.querySelector('#carro-afazer-table tbody');
-  const totalEl = document.getElementById('carro-afazer-total');
+  const tbody   = document.querySelector('#face-afazer-table tbody');
+  const totalEl = document.getElementById('face-afazer-total');
 
   if (afazer.length === 0) {
     tbody.innerHTML = `<tr><td colspan="3" class="empty-state">Nenhum item pendente.</td></tr>`;
@@ -113,7 +119,7 @@ function renderAfazer() {
     });
   });
   tbody.querySelectorAll('[data-action="delete"]').forEach(btn => {
-    btn.addEventListener('click', () => excluirItem('carro_afazer', btn.dataset.id, afazer));
+    btn.addEventListener('click', () => excluirItem(btn.dataset.id, afazer));
   });
 }
 
@@ -138,12 +144,12 @@ function abrirModalAfazer(item) {
       }
       try {
         if (editar) {
-          await updateDoc(doc(db, 'carro_afazer', item.id), { descricao, valor });
+          await updateDoc(doc(db, 'face', item.id), { descricao, valor });
           showToast('Item atualizado!', 'success');
         } else {
           const maxPrio    = afazer.length ? (afazer[afazer.length - 1].prioridade || 0) : 0;
           const prioridade = maxPrio + 1;
-          await addDoc(collection(db, 'carro_afazer'), { prioridade, descricao, valor });
+          await addDoc(collection(db, 'face'), { tipo: 'afazer', prioridade, descricao, valor });
           showToast('Item adicionado!', 'success');
         }
       } catch { showToast('Erro ao salvar.', 'error'); }
@@ -155,8 +161,8 @@ function abrirModalAfazer(item) {
 // ── FEITOS ────────────────────────────────────────────────────────────────────
 
 function renderFeitos() {
-  const tbody   = document.querySelector('#carro-feitos-table tbody');
-  const totalEl = document.getElementById('carro-feitos-total');
+  const tbody   = document.querySelector('#face-feitos-table tbody');
+  const totalEl = document.getElementById('face-feitos-total');
 
   if (feitos.length === 0) {
     tbody.innerHTML = `<tr><td colspan="4" class="empty-state">Nenhuma manutenção registrada.</td></tr>`;
@@ -183,13 +189,13 @@ function renderFeitos() {
     const restantes = feitos.length - feitosVisiveis;
     tbody.innerHTML += `<tr>
       <td colspan="4" style="text-align:center;padding:.6rem 0">
-        <button id="btn-feitos-mais" class="btn-secondary">Carregar mais (${restantes})</button>
+        <button id="btn-feitos-mais-face" class="btn-secondary">Carregar mais (${restantes})</button>
       </td>
     </tr>`;
   } else if (!mostrarAntigos) {
     tbody.innerHTML += `<tr>
       <td colspan="4" style="text-align:center;padding:.6rem 0">
-        <button class="btn-secondary btn-carro-antigos" style="font-size:.8rem">Carregar histórico completo</button>
+        <button class="btn-secondary btn-face-antigos" style="font-size:.8rem">Carregar histórico completo</button>
       </td>
     </tr>`;
   }
@@ -203,20 +209,20 @@ function renderFeitos() {
     });
   });
   tbody.querySelectorAll('[data-action="delete"]').forEach(btn => {
-    btn.addEventListener('click', () => excluirItem('carro_feitos', btn.dataset.id, feitos));
+    btn.addEventListener('click', () => excluirItem(btn.dataset.id, feitos));
   });
 
-  const btnMais = document.getElementById('btn-feitos-mais');
+  const btnMais = document.getElementById('btn-feitos-mais-face');
   if (btnMais) {
     btnMais.addEventListener('click', () => { feitosVisiveis += 5; renderFeitos(); });
   }
 
-  const btnAntigos = tbody.querySelector('.btn-carro-antigos');
+  const btnAntigos = tbody.querySelector('.btn-face-antigos');
   if (btnAntigos) {
     btnAntigos.addEventListener('click', () => {
       mostrarAntigos = true;
       feitosVisiveis = 5;
-      subscribeAll();
+      recalcular();
     });
   }
 }
@@ -248,10 +254,10 @@ function abrirModalFeito(item) {
       }
       try {
         if (editar) {
-          await updateDoc(doc(db, 'carro_feitos', item.id), { data, descricao, valor });
+          await updateDoc(doc(db, 'face', item.id), { data, descricao, valor });
           showToast('Manutenção atualizada!', 'success');
         } else {
-          await addDoc(collection(db, 'carro_feitos'), { data, descricao, valor });
+          await addDoc(collection(db, 'face'), { tipo: 'feito', data, descricao, valor });
           showToast('Manutenção registrada!', 'success');
         }
       } catch { showToast('Erro ao salvar.', 'error'); }
@@ -263,7 +269,7 @@ function abrirModalFeito(item) {
 // ── MANUTENÇÃO PREVENTIVA ─────────────────────────────────────────────────────
 
 function renderManutencao() {
-  const tbody = document.querySelector('#carro-manutencao-table tbody');
+  const tbody = document.querySelector('#face-manutencao-table tbody');
 
   if (manutencao.length === 0) {
     tbody.innerHTML = `<tr><td colspan="6" class="empty-state">Nenhum item cadastrado.</td></tr>`;
@@ -291,7 +297,7 @@ function renderManutencao() {
     });
   });
   tbody.querySelectorAll('[data-action="delete"]').forEach(btn => {
-    btn.addEventListener('click', () => excluirItem('carro_manutencao', btn.dataset.id, manutencao));
+    btn.addEventListener('click', () => excluirItem(btn.dataset.id, manutencao));
   });
 }
 
@@ -331,10 +337,10 @@ function abrirModalManutencao(item) {
       const payload = { descricao, data, kmUltimaTroca, kmProximaTroca, valor };
       try {
         if (editar) {
-          await updateDoc(doc(db, 'carro_manutencao', item.id), payload);
+          await updateDoc(doc(db, 'face', item.id), payload);
           showToast('Atualizado!', 'success');
         } else {
-          await addDoc(collection(db, 'carro_manutencao'), payload);
+          await addDoc(collection(db, 'face'), { tipo: 'manutencao', ...payload });
           showToast('Adicionado!', 'success');
         }
       } catch { showToast('Erro ao salvar.', 'error'); }
@@ -351,7 +357,7 @@ function kmEfetivo(item) {
 }
 
 function renderAbastecimento() {
-  const tbody = document.querySelector('#carro-abastecimento-table tbody');
+  const tbody = document.querySelector('#face-abastecimento-table tbody');
 
   if (abastecimento.length === 0) {
     tbody.innerHTML = `<tr><td colspan="8" class="empty-state">Nenhum abastecimento registrado.</td></tr>`;
@@ -389,7 +395,7 @@ function renderAbastecimento() {
     const restantes = abastecimento.length - abastecimentoVisiveis;
     tbody.innerHTML += `<tr>
       <td colspan="8" style="text-align:center;padding:.6rem 0">
-        <button id="btn-abastecimento-mais" class="btn-secondary">Carregar mais (${restantes})</button>
+        <button id="btn-abastecimento-mais-face" class="btn-secondary">Carregar mais (${restantes})</button>
       </td>
     </tr>`;
   }
@@ -401,10 +407,10 @@ function renderAbastecimento() {
     });
   });
   tbody.querySelectorAll('[data-action="delete"]').forEach(btn => {
-    btn.addEventListener('click', () => excluirItem('carro_abastecimento', btn.dataset.id, abastecimento));
+    btn.addEventListener('click', () => excluirItem(btn.dataset.id, abastecimento));
   });
 
-  const btnMais = document.getElementById('btn-abastecimento-mais');
+  const btnMais = document.getElementById('btn-abastecimento-mais-face');
   if (btnMais) {
     btnMais.addEventListener('click', () => { abastecimentoVisiveis += 5; renderAbastecimento(); });
   }
@@ -479,10 +485,10 @@ function abrirModalAbastecimento(item) {
       const payload = { data, km, correcao, litros, valorPago, tipoCombustivel };
       try {
         if (editar) {
-          await updateDoc(doc(db, 'carro_abastecimento', item.id), payload);
+          await updateDoc(doc(db, 'face', item.id), payload);
           showToast('Abastecimento atualizado!', 'success');
         } else {
-          await addDoc(collection(db, 'carro_abastecimento'), payload);
+          await addDoc(collection(db, 'face'), { tipo: 'abastecimento', ...payload });
           showToast('Abastecimento registrado!', 'success');
         }
         if (valorPago !== null) localStorage.setItem(LS_VALOR_PAGO, String(valorPago));
@@ -500,14 +506,14 @@ function abrirModalAbastecimento(item) {
 
 // ── HELPERS ───────────────────────────────────────────────────────────────────
 
-function excluirItem(colecao, id, lista) {
+function excluirItem(id, lista) {
   const nome = lista.find(i => i.id === id)?.descricao || 'este item';
   openModal(
     'Excluir item',
     `<p>Deseja excluir <strong>${esc(nome)}</strong>? Esta ação não pode ser desfeita.</p>`,
     async () => {
       try {
-        await deleteDoc(doc(db, colecao, id));
+        await deleteDoc(doc(db, 'face', id));
         showToast('Item excluído.', 'success');
       } catch { showToast('Erro ao excluir.', 'error'); }
     },

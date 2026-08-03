@@ -54,36 +54,31 @@ O app é organizado como uma planilha com as seguintes seções:
 - Distribuição Mensal: planejamento do salário por mês, cada linha é um mês e cada coluna é uma conta fixa
 - Patrimônio: tabela de ativos e investimentos
 - Contas Casa: gastos da casa por mês, divididos entre Digo e Bella
-- Focus: gastos com o Ford Focus — coleções carro_feitos (gastos feitos), carro_afazer (lista de serviços pendentes) e carro_abastecimento (registro de combustível)
-- Face: gastos com o Ecosport/Face — coleções focus_feitos (gastos feitos), focus_afazer (lista de serviços pendentes) e focus_abastecimento (registro de combustível)
+- Focus: gastos com o Ford Focus — coleção "focus" (um documento por registro, campo 'tipo': 'feito'|'afazer'|'manutencao'|'abastecimento')
+- Face: gastos com o Ecosport/Face — coleção "face" (mesmo esquema, campo 'tipo': 'feito'|'afazer'|'manutencao'|'abastecimento')
 - Devo/Devem: controle de dívidas (não coberto pelas suas ferramentas)
 - No menu, o usuário pode criar novas sections (botão "+ Nova Section") a partir de 5 templates —
   Banco, Tabela Distribuição, Patrimônio, Novo Carro e Devo/Devem — e também "excluir" (ocultar) qualquer
   section, fixa ou customizada. Você também pode fazer isso pelas ferramentas criar_secao e excluir_secao.
 
-7. COLEÇÃO: carro_feitos/{id}  — gastos já realizados no Focus
-   Campos: data (YYYY-MM-DD), descricao (string), valor (número)
+7. COLEÇÃO: focus/{id}  — todos os registros do Focus, diferenciados pelo campo 'tipo':
+   - tipo:'feito'  — gasto já realizado: data (YYYY-MM-DD), descricao (string), valor (número)
+   - tipo:'afazer' — serviço pendente/futuro: prioridade (número, definida automaticamente como
+     fim da fila — NÃO é pedida ao usuário), descricao (string), valor (número estimado)
+   - tipo:'manutencao' — manutenção preventiva: descricao, data da última troca, kmUltimaTroca,
+     kmProximaTroca, valor
+   - tipo:'abastecimento' — data (YYYY-MM-DD), km (número, km rodado NESTE tanque, não é odômetro
+     acumulado), correcao (número 0-100, % a descontar do km informado), litros (número),
+     valorPago (número ou null, opcional — preço pago POR LITRO, não o total), tipoCombustivel (string)
+     → km efetivo = km * (1 - correcao/100); km/L = km efetivo / litros;
+       R$/km = (valorPago * litros) / km efetivo (se houver valorPago)
 
-8. COLEÇÃO: carro_afazer/{id}  — serviços pendentes/futuros no Focus
-   Campos: prioridade (número, quanto menor = mais urgente), descricao (string), valor (número estimado)
+8. COLEÇÃO: face/{id}  — mesmo esquema da coleção "focus" (item 7), só que para o Face/Ecosport
 
-9. COLEÇÃO: focus_feitos/{id}  — gastos já realizados no Face
-   Campos: data (YYYY-MM-DD), descricao (string), valor (número)
+9. COLEÇÃO: combustivel_tipos/{id} — tipos de combustível cadastrados (compartilhada entre Focus e Face)
+   Campos: nome (string). Já vem com Gasolina, Etanol e Diesel; o usuário pode ter cadastrado outros (ex: GNV)
 
-10. COLEÇÃO: focus_afazer/{id}  — serviços pendentes/futuros no Face
-    Campos: prioridade (número, quanto menor = mais urgente), descricao (string), valor (número estimado)
-
-11. COLEÇÃO: carro_abastecimento/{id} — abastecimentos do Focus | focus_abastecimento/{id} — abastecimentos do Face
-    Campos: data (YYYY-MM-DD), km (número, km rodado NESTE tanque, não é odômetro acumulado),
-    correcao (número 0-100, % a descontar do km informado), litros (número),
-    valorPago (número ou null, opcional — preço pago POR LITRO, não o total), tipoCombustivel (string, ex: "Gasolina")
-    → km efetivo = km * (1 - correcao/100); km/L = km efetivo / litros; R$/km = (valorPago * litros) / km efetivo (se houver valorPago)
-    → Use para: registrar um abastecimento e para calcular/informar consumo (km/L) e custo por km de cada carro
-
-12. COLEÇÃO: combustivel_tipos/{id} — tipos de combustível cadastrados (compartilhada entre Focus e Face)
-    Campos: nome (string). Já vem com Gasolina, Etanol e Diesel; o usuário pode ter cadastrado outros (ex: GNV)
-
-13. COLEÇÃO: secoes_customizadas/{id} — sections criadas pelo usuário (pelo app ou por você) a partir de um
+10. COLEÇÃO: secoes_customizadas/{id} — sections criadas pelo usuário (pelo app ou por você) a partir de um
     template, iguais em funcionamento a uma section fixa só que com nome e coleções próprias.
     Campos: nome, slug, template ("banco"|"distribuicao"|"patrimonio"|"carro"|"devo-devem"),
     icone, colecoes (nomes das coleções geradas a partir do slug), criadoEm, origem ("web"|"agente"),
@@ -91,8 +86,8 @@ O app é organizado como uma planilha com as seguintes seções:
     → Excluir NUNCA apaga dados: só marca ativo=false (soft delete) — o histórico continua no Firestore
     → Use para: criar novas sections (ex: "Moto", "Cartão Nubank") e para "excluir" (ocultar) sections
 
-14. DOCUMENTO: config/secoes_ocultas — Campos: nomes (array com as chaves das sections FIXAS que o
-    usuário ocultou: "banco", "distribuicao", "patrimonio", "contas-casa", "carro", "face", "devo-devem")
+11. DOCUMENTO: config/secoes_ocultas — Campos: nomes (array com as chaves das sections FIXAS que o
+    usuário ocultou: "banco", "distribuicao", "patrimonio", "contas-casa", "focus", "face", "devo-devem")
     → "Dashboard" nunca pode ser ocultado
 
 REGRAS DE COMPORTAMENTO:
@@ -317,15 +312,14 @@ const FERRAMENTAS = [
   },
   {
     name: 'excluir_item_carro',
-    description: 'Remove um registro de gasto feito ou item da lista a fazer de um dos carros.',
+    description: 'Remove um registro (gasto feito, item da lista a fazer, manutenção ou abastecimento) de um dos carros, pelo ID do documento.',
     parameters: {
       type: 'object',
       properties: {
-        carro:   { type: 'string', description: '"focus" ou "face".' },
-        colecao: { type: 'string', description: '"feitos" para gastos realizados, "afazer" para a lista pendente.' },
-        id:      { type: 'string', description: 'ID do documento a excluir.' }
+        carro: { type: 'string', description: '"focus" ou "face".' },
+        id:    { type: 'string', description: 'ID do documento a excluir.' }
       },
-      required: ['carro', 'colecao', 'id']
+      required: ['carro', 'id']
     }
   },
   {
@@ -567,42 +561,42 @@ async function executarTool(nome, args, db, acoesLog) {
       }
 
       case 'consultar_carro': {
-        const isFocus  = args.carro === 'focus';
-        const colFeitos = isFocus ? 'carro_feitos' : 'focus_feitos';
-        const colAfazer = isFocus ? 'carro_afazer' : 'focus_afazer';
-        const nome      = isFocus ? 'Focus' : 'Face';
+        const isFocus = args.carro === 'focus';
+        const colecao = isFocus ? 'focus' : 'face';
+        const nome    = isFocus ? 'Focus' : 'Face';
 
-        const [snapFeitos, snapAfazer] = await Promise.all([
-          db.collection(colFeitos).get(),
-          db.collection(colAfazer).orderBy('prioridade', 'asc').get()
-        ]);
+        const snap = await db.collection(colecao).get();
+        const docs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
 
-        const feitos = snapFeitos.docs.map(d => ({ id: d.id, ...d.data() }));
-        feitos.sort((a, b) => String(b.data || '').localeCompare(String(a.data || '')));
-        const afazer = snapAfazer.docs.map(d => ({ id: d.id, ...d.data() }));
+        const feitos = docs
+          .filter(d => d.tipo === 'feito')
+          .sort((a, b) => String(b.data || '').localeCompare(String(a.data || '')));
+        const afazer = docs
+          .filter(d => d.tipo === 'afazer')
+          .sort((a, b) => (parseFloat(a.prioridade) || 0) - (parseFloat(b.prioridade) || 0));
 
         const totalFeitos = feitos.reduce((s, d) => s + (parseFloat(d.valor) || 0), 0);
         const totalAfazer = afazer.reduce((s, d) => s + (parseFloat(d.valor) || 0), 0);
 
-        acoesLog.push({ tipo: 'LEITURA', colecao: `${colFeitos}+${colAfazer}`, descricao: `Consultou carro ${nome}` });
+        acoesLog.push({ tipo: 'LEITURA', colecao, descricao: `Consultou carro ${nome}` });
         return { sucesso: true, carro: nome, feitos, total_gasto: totalFeitos, afazer, total_estimado_afazer: totalAfazer };
       }
 
       case 'registrar_gasto_carro': {
-        const isFocus  = args.carro === 'focus';
-        const colecao  = isFocus ? 'carro_feitos' : 'focus_feitos';
-        const data     = args.data || dataHoje;
-        const ref      = await db.collection(colecao).add({ data, descricao: args.descricao, valor: args.valor });
+        const isFocus = args.carro === 'focus';
+        const colecao = isFocus ? 'focus' : 'face';
+        const data    = args.data || dataHoje;
+        const ref     = await db.collection(colecao).add({ tipo: 'feito', data, descricao: args.descricao, valor: args.valor });
         acoesLog.push({ tipo: 'ESCRITA', colecao, id: ref.id, descricao: `Gasto ${args.carro}: "${args.descricao}" R$ ${args.valor}` });
         return { sucesso: true, id: ref.id };
       }
 
       case 'registrar_afazer_carro': {
-        const isFocus  = args.carro === 'focus';
-        const colecao  = isFocus ? 'carro_afazer' : 'focus_afazer';
-        const snap     = await db.collection(colecao).orderBy('prioridade', 'desc').limit(1).get();
-        const maxPrio  = snap.empty ? 0 : (snap.docs[0].data().prioridade || 0);
-        const ref      = await db.collection(colecao).add({ prioridade: maxPrio + 1, descricao: args.descricao, valor: args.valor });
+        const isFocus = args.carro === 'focus';
+        const colecao = isFocus ? 'focus' : 'face';
+        const snap    = await db.collection(colecao).where('tipo', '==', 'afazer').get();
+        const maxPrio = snap.docs.reduce((max, d) => Math.max(max, d.data().prioridade || 0), 0);
+        const ref     = await db.collection(colecao).add({ tipo: 'afazer', prioridade: maxPrio + 1, descricao: args.descricao, valor: args.valor });
         acoesLog.push({ tipo: 'ESCRITA', colecao, id: ref.id, descricao: `A fazer ${args.carro}: "${args.descricao}" R$ ${args.valor}` });
         return { sucesso: true, id: ref.id, prioridade: maxPrio + 1 };
       }
@@ -677,9 +671,7 @@ async function executarTool(nome, args, db, acoesLog) {
 
       case 'excluir_item_carro': {
         const isFocus = args.carro === 'focus';
-        const colecao = args.colecao === 'feitos'
-          ? (isFocus ? 'carro_feitos' : 'focus_feitos')
-          : (isFocus ? 'carro_afazer' : 'focus_afazer');
+        const colecao = isFocus ? 'focus' : 'face';
         const snap = await db.collection(colecao).doc(args.id).get();
         if (!snap.exists) return { sucesso: false, erro: `Documento ${args.id} não encontrado em ${colecao}` };
         const dadosAntes = snap.data();
@@ -690,7 +682,7 @@ async function executarTool(nome, args, db, acoesLog) {
 
       case 'registrar_abastecimento': {
         const isFocus  = args.carro === 'focus';
-        const colecao  = isFocus ? 'carro_abastecimento' : 'focus_abastecimento';
+        const colecao  = isFocus ? 'focus' : 'face';
         const data     = args.data || dataHoje;
         const correcao = args.correcao || 0;
         const valorPago = args.valorPago !== undefined ? args.valorPago : null;
@@ -701,7 +693,7 @@ async function executarTool(nome, args, db, acoesLog) {
         if (!jaExiste && nomeTipo) await db.collection('combustivel_tipos').add({ nome: nomeTipo });
 
         const ref = await db.collection(colecao).add({
-          data, km: args.km, correcao, litros: args.litros, valorPago, tipoCombustivel: nomeTipo
+          tipo: 'abastecimento', data, km: args.km, correcao, litros: args.litros, valorPago, tipoCombustivel: nomeTipo
         });
 
         const kmEfetivo  = args.km * (1 - correcao / 100);
@@ -717,22 +709,25 @@ async function executarTool(nome, args, db, acoesLog) {
 
       case 'consultar_abastecimento': {
         const isFocus = args.carro === 'focus';
-        const colecao = isFocus ? 'carro_abastecimento' : 'focus_abastecimento';
+        const colecao = isFocus ? 'focus' : 'face';
         const limite  = args.limite || 10;
 
-        const snap = await db.collection(colecao).orderBy('data', 'desc').limit(limite).get();
-        const registros = snap.docs.map(d => {
-          const item      = { id: d.id, ...d.data() };
-          const correcao  = parseFloat(item.correcao) || 0;
-          const kmEfetivo = (parseFloat(item.km) || 0) * (1 - correcao / 100);
-          const litros    = parseFloat(item.litros) || 0;
-          return {
-            ...item,
-            km_efetivo:  kmEfetivo,
-            km_por_litro: litros > 0 ? kmEfetivo / litros : null,
-            rs_por_km:    (item.valorPago && kmEfetivo > 0) ? (item.valorPago * litros) / kmEfetivo : null
-          };
-        });
+        const snap = await db.collection(colecao).where('tipo', '==', 'abastecimento').get();
+        const registros = snap.docs
+          .map(d => {
+            const item      = { id: d.id, ...d.data() };
+            const correcao  = parseFloat(item.correcao) || 0;
+            const kmEfetivo = (parseFloat(item.km) || 0) * (1 - correcao / 100);
+            const litros    = parseFloat(item.litros) || 0;
+            return {
+              ...item,
+              km_efetivo:  kmEfetivo,
+              km_por_litro: litros > 0 ? kmEfetivo / litros : null,
+              rs_por_km:    (item.valorPago && kmEfetivo > 0) ? (item.valorPago * litros) / kmEfetivo : null
+            };
+          })
+          .sort((a, b) => String(b.data || '').localeCompare(String(a.data || '')))
+          .slice(0, limite);
 
         const validos = registros.filter(r => r.km_por_litro !== null);
         const mediaKmPorLitro = validos.length

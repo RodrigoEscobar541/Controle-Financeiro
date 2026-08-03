@@ -3,8 +3,8 @@ import { initBanco }       from './banco.js';
 import { initDistribuicao} from './distribuicao.js';
 import { initPatrimonio }  from './patrimonio.js';
 import { initContasCasa }  from './contas-casa.js';
-import { initCarro }       from './carro.js';
 import { initFocus }       from './focus.js';
+import { initFace }        from './face.js';
 import { initDevoDeve }    from './devo-devem.js';
 import { auth, onAuthStateChanged } from './auth.js';
 import { initNotas }       from './notas.js';
@@ -205,7 +205,7 @@ const SECTION_TITLES = {
   distribuicao: 'Distribuição Mensal do Salário',
   patrimonio:   'Patrimônio e Investimentos',
   'contas-casa':'Contas da Casa',
-  carro:        'Focus',
+  focus:        'Focus',
   face:         'Face',
   'devo-devem': 'Devo e Devem'
 };
@@ -236,8 +236,8 @@ function activateSection(name) {
     else if (name === 'distribuicao') initDistribuicao();
     else if (name === 'patrimonio')   initPatrimonio();
     else if (name === 'contas-casa')  initContasCasa();
-    else if (name === 'carro')        initCarro();
-    else if (name === 'face')         initFocus();
+    else if (name === 'focus')        initFocus();
+    else if (name === 'face')         initFace();
     else if (name === 'devo-devem')   initDevoDeve();
     else if (name.startsWith('custom-')) {
       const secao = secoesCustomizadasMap.get(name.slice('custom-'.length));

@@ -63,8 +63,8 @@ export async function initDashboard() {
     carregarContasCasaMes(),
     carregarTotalInvestimentos(),
     carregarDevoDeve(),
-    carregarConsumoCarro('carro_abastecimento', 'dash-focus-kml', 'dash-focus-rskm'),
-    carregarConsumoCarro('focus_abastecimento', 'dash-face-kml', 'dash-face-rskm'),
+    carregarConsumoCarro('focus', 'dash-focus-kml', 'dash-focus-rskm'),
+    carregarConsumoCarro('face', 'dash-face-kml', 'dash-face-rskm'),
     renderCardsSecoesCustomizadas()
   ]);
 }
@@ -266,17 +266,22 @@ async function carregarTotalInvestimentos() {
 }
 
 // Consumo médio (km/L e R$/km) dos últimos 100 abastecimentos de um carro
+// (a coleção é compartilhada entre os 4 tipos de registro — filtra por tipo e
+// ordena/limita em memória para não precisar de índice composto no Firestore)
 async function carregarConsumoCarro(colecao, idKmL, idRsKm) {
   const elKmL  = document.getElementById(idKmL);
   const elRsKm = document.getElementById(idRsKm);
   try {
-    const q    = query(collection(db, colecao), orderBy('data', 'desc'), limit(100));
+    const q    = query(collection(db, colecao), where('tipo', '==', 'abastecimento'));
     const snap = await getDocs(q);
+    const itensRecentes = snap.docs
+      .map(d => d.data())
+      .sort((a, b) => String(b.data || '').localeCompare(String(a.data || '')))
+      .slice(0, 100);
 
     const kmLValores  = [];
     const rsKmValores = [];
-    snap.docs.forEach(d => {
-      const item      = d.data();
+    itensRecentes.forEach(item => {
       const correcao  = parseFloat(item.correcao) || 0;
       const kmEfetivo = (parseFloat(item.km) || 0) * (1 - correcao / 100);
       const litros    = parseFloat(item.litros) || 0;

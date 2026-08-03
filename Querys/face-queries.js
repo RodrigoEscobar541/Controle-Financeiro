@@ -1,5 +1,5 @@
 /**
- * Querys — Coleção: focus
+ * Querys — Coleção: face
  * Usadas pelo Bot Render (firebase-admin SDK)
  *
  * Um documento por registro, diferenciado pelo campo `tipo`:
@@ -10,25 +10,25 @@
  */
 
 async function getAfazer(db) {
-  const snap = await db.collection('focus').where('tipo', '==', 'afazer').get();
+  const snap = await db.collection('face').where('tipo', '==', 'afazer').get();
   const itens = snap.docs.map(d => ({ id: d.id, ...d.data() }));
   return itens.sort((a, b) => (parseFloat(a.prioridade) || 0) - (parseFloat(b.prioridade) || 0));
 }
 
 async function adicionarAfazer(db, { prioridade, descricao, valor }) {
-  return db.collection('focus').add({ tipo: 'afazer', prioridade, descricao, valor });
+  return db.collection('face').add({ tipo: 'afazer', prioridade, descricao, valor });
 }
 
 async function atualizarAfazer(db, id, { descricao, valor }) {
-  return db.collection('focus').doc(id).update({ descricao, valor });
+  return db.collection('face').doc(id).update({ descricao, valor });
 }
 
 async function excluirAfazer(db, id) {
-  return db.collection('focus').doc(id).delete();
+  return db.collection('face').doc(id).delete();
 }
 
 async function getFeitos(db, limite = 50) {
-  const snap = await db.collection('focus').where('tipo', '==', 'feito').get();
+  const snap = await db.collection('face').where('tipo', '==', 'feito').get();
   const itens = snap.docs.map(d => ({ id: d.id, ...d.data() }));
   return itens
     .sort((a, b) => String(b.data || '').localeCompare(String(a.data || '')))
@@ -36,36 +36,36 @@ async function getFeitos(db, limite = 50) {
 }
 
 async function adicionarFeito(db, { data, descricao, valor }) {
-  return db.collection('focus').add({ tipo: 'feito', data, descricao, valor });
+  return db.collection('face').add({ tipo: 'feito', data, descricao, valor });
 }
 
 async function atualizarFeito(db, id, { data, descricao, valor }) {
-  return db.collection('focus').doc(id).update({ data, descricao, valor });
+  return db.collection('face').doc(id).update({ data, descricao, valor });
 }
 
 async function excluirFeito(db, id) {
-  return db.collection('focus').doc(id).delete();
+  return db.collection('face').doc(id).delete();
 }
 
 async function getManutencao(db) {
-  const snap = await db.collection('focus').where('tipo', '==', 'manutencao').get();
+  const snap = await db.collection('face').where('tipo', '==', 'manutencao').get();
   return snap.docs.map(d => ({ id: d.id, ...d.data() }));
 }
 
 async function adicionarManutencao(db, { descricao, data, kmUltimaTroca, kmProximaTroca, valor }) {
-  return db.collection('focus').add({ tipo: 'manutencao', descricao, data, kmUltimaTroca, kmProximaTroca, valor });
+  return db.collection('face').add({ tipo: 'manutencao', descricao, data, kmUltimaTroca, kmProximaTroca, valor });
 }
 
 async function atualizarManutencao(db, id, { descricao, data, kmUltimaTroca, kmProximaTroca, valor }) {
-  return db.collection('focus').doc(id).update({ descricao, data, kmUltimaTroca, kmProximaTroca, valor });
+  return db.collection('face').doc(id).update({ descricao, data, kmUltimaTroca, kmProximaTroca, valor });
 }
 
 async function excluirManutencao(db, id) {
-  return db.collection('focus').doc(id).delete();
+  return db.collection('face').doc(id).delete();
 }
 
 async function getAbastecimento(db, limite = 50) {
-  const snap = await db.collection('focus').where('tipo', '==', 'abastecimento').get();
+  const snap = await db.collection('face').where('tipo', '==', 'abastecimento').get();
   const itens = snap.docs.map(d => ({ id: d.id, ...d.data() }));
   return itens
     .sort((a, b) => String(b.data || '').localeCompare(String(a.data || '')))
@@ -73,15 +73,15 @@ async function getAbastecimento(db, limite = 50) {
 }
 
 async function adicionarAbastecimento(db, { data, km, correcao, litros, valorPago, tipoCombustivel }) {
-  return db.collection('focus').add({ tipo: 'abastecimento', data, km, correcao, litros, valorPago, tipoCombustivel });
+  return db.collection('face').add({ tipo: 'abastecimento', data, km, correcao, litros, valorPago, tipoCombustivel });
 }
 
 async function atualizarAbastecimento(db, id, { data, km, correcao, litros, valorPago, tipoCombustivel }) {
-  return db.collection('focus').doc(id).update({ data, km, correcao, litros, valorPago, tipoCombustivel });
+  return db.collection('face').doc(id).update({ data, km, correcao, litros, valorPago, tipoCombustivel });
 }
 
 async function excluirAbastecimento(db, id) {
-  return db.collection('focus').doc(id).delete();
+  return db.collection('face').doc(id).delete();
 }
 
 module.exports = {

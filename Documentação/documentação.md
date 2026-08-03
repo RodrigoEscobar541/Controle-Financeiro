@@ -161,6 +161,37 @@ bot, a cada ~1 min; a dashboard só lê para o selo online/offline).
 }
 ```
 
+### Coleção: `focus` (section Focus) / `face` (section Face)
+1 coleção por carro — um documento por registro, diferenciado pelo campo `tipo`
+(`"afazer"|"feito"|"manutencao"|"abastecimento"`). Ver `Arquitetura_BD_Firestore.md`
+para o schema completo de cada `tipo` e a convenção por trás dessa modelagem.
+
+### Coleção: `dividas`
+Devo/Devem. Um documento por parcela.
+```
+{id_aleatorio}: {
+  tipo:      "Devo"|"Devem",
+  data:      "06-2026",       // MM-YYYY
+  descricao: "Empréstimo Nubank (2/6)",
+  valor:     150.00,
+  status:    "Aberta"|"Paga"
+}
+```
+
+### Coleção: `combustivel_tipos`
+Tipos de combustível cadastrados, compartilhada entre as sections Focus e Face.
+```
+{id_aleatorio}: { nome: "Gasolina" }
+```
+
+### Coleção: `secoes_customizadas`
+Sections criadas pelo usuário (botão "+ Nova Section"). Ver cabeçalho de
+`public/js/section-templates.js` para o schema completo.
+
+### Coleção: `agente_log`
+Registro automático de cada interação do Agente IA (mensagem, resposta e ações
+realizadas no BD). Ver `Agente_Financeiro_IA.md`.
+
 ---
 
 ## Comandos do Bot Telegram

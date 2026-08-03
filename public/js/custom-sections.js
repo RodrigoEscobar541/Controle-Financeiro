@@ -3,7 +3,7 @@
  *
  * Cada template (banco, distribuicao, patrimonio, carro, devo-devem) replica o
  * comportamento da section original correspondente (ver banco.js, distribuicao.js,
- * patrimonio.js, carro.js, devo-devem.js), mas lendo/escrevendo nas coleções
+ * patrimonio.js, focus.js/face.js, devo-devem.js), mas lendo/escrevendo nas coleções
  * definidas em `secao.colecoes` (geradas a partir do slug escolhido pelo usuário)
  * em vez das coleções fixas do app.
  *
@@ -74,14 +74,16 @@ export async function metricaSecao(secao) {
       };
     }
     case 'carro': {
-      const [feitosSnap, afazerSnap] = await Promise.all([
-        getDocs(collection(db, secao.colecoes.feitos)),
-        getDocs(collection(db, secao.colecoes.afazer))
-      ]);
-      const totalGasto = feitosSnap.docs.reduce((s, d) => s + (parseFloat(d.data().valor) || 0), 0);
+      const snap = await getDocs(collection(db, secao.colecoes.principal));
+      let totalGasto = 0, pendencias = 0;
+      snap.docs.forEach(d => {
+        const v = d.data();
+        if (v.tipo === 'feito') totalGasto += parseFloat(v.valor) || 0;
+        else if (v.tipo === 'afazer') pendencias++;
+      });
       return {
         principal:   { label: 'Total gasto (Feitos)', valor: fmtBRL(totalGasto) },
-        secundaria:  { label: 'Pendências (A Fazer)', valor: String(afazerSnap.size) }
+        secundaria:  { label: 'Pendências (A Fazer)', valor: String(pendencias) }
       };
     }
     case 'devo-devem': {
@@ -601,7 +603,7 @@ function montarDistribuicao(container, secao) {
 // TEMPLATE: NOVO CARRO (A Fazer / Feitos / Abastecimento / Manutenção)
 // ──────────────────────────────────────────────
 function montarCarro(container, secao) {
-  const { afazer: colAfazer, feitos: colFeitos, manutencao: colManutencao, abastecimento: colAbastecimento } = secao.colecoes;
+  const colPrincipal = secao.colecoes.principal;
 
   container.innerHTML = `
     <div class="card">
@@ -610,9 +612,9 @@ function montarCarro(container, secao) {
         <button class="btn btn-primary" data-role="btn-add-afazer">+ Novo Item</button>
       </div>
       <table class="data-table">
-        <thead><tr><th style="width:80px;text-align:center">Prioridade</th><th>Descrição</th><th class="text-right">Valor estimado</th><th style="width:90px"></th></tr></thead>
-        <tbody data-role="tbody-afazer"><tr><td colspan="4" class="loading">Carregando...</td></tr></tbody>
-        <tfoot><tr><td colspan="2"><strong>Total estimado</strong></td><td class="text-right"><strong data-role="total-afazer">R$ 0,00</strong></td><td></td></tr></tfoot>
+        <thead><tr><th>Descrição</th><th class="text-right">Valor estimado</th><th style="width:90px"></th></tr></thead>
+        <tbody data-role="tbody-afazer"><tr><td colspan="3" class="loading">Carregando...</td></tr></tbody>
+        <tfoot><tr><td><strong>Total estimado</strong></td><td class="text-right"><strong data-role="total-afazer">R$ 0,00</strong></td><td></td></tr></tfoot>
       </table>
     </div>
 
@@ -661,7 +663,7 @@ function montarCarro(container, secao) {
 
   const q = role => container.querySelector(`[data-role="${role}"]`);
 
-  let afazer = [], feitos = [], manutencao = [], abastecimento = [], tiposCombustivel = [];
+  let docsRaw = [], afazer = [], feitos = [], manutencao = [], abastecimento = [], tiposCombustivel = [];
   let feitosVisiveis = 5, abastecimentoVisiveis = 1;
   const LS_VALOR_PAGO = `tf_valorPago_custom_${secao.slug}`;
 
@@ -673,31 +675,37 @@ function montarCarro(container, secao) {
 
   subscribeTiposCombustivel(lista => { tiposCombustivel = lista; });
 
-  onSnapshot(query(collection(db, colAfazer), orderBy('prioridade', 'asc')), snap => {
-    afazer = snap.docs.map(d => ({ id: d.id, ...d.data() })); renderAfazer();
-  }, () => showToast('Erro ao carregar A Fazer.', 'error'));
+  onSnapshot(collection(db, colPrincipal), snap => {
+    docsRaw = snap.docs.map(d => ({ id: d.id, ...d.data() }));
 
-  onSnapshot(query(collection(db, colFeitos), orderBy('data', 'desc')), snap => {
-    feitos = snap.docs.map(d => ({ id: d.id, ...d.data() })); renderFeitos();
-  }, () => showToast('Erro ao carregar Feitos.', 'error'));
+    afazer = docsRaw
+      .filter(d => d.tipo === 'afazer')
+      .sort((a, b) => (parseFloat(a.prioridade) || 0) - (parseFloat(b.prioridade) || 0));
 
-  onSnapshot(collection(db, colManutencao), snap => {
-    manutencao = snap.docs.map(d => ({ id: d.id, ...d.data() })); renderManutencao();
-  }, () => showToast('Erro ao carregar Manutenção.', 'error'));
+    feitos = docsRaw
+      .filter(d => d.tipo === 'feito')
+      .sort((a, b) => String(b.data || '').localeCompare(String(a.data || '')));
 
-  onSnapshot(query(collection(db, colAbastecimento), orderBy('data', 'desc')), snap => {
-    abastecimento = snap.docs.map(d => ({ id: d.id, ...d.data() })); renderAbastecimento();
-  }, () => showToast('Erro ao carregar Abastecimento.', 'error'));
+    manutencao = docsRaw.filter(d => d.tipo === 'manutencao');
+
+    abastecimento = docsRaw
+      .filter(d => d.tipo === 'abastecimento')
+      .sort((a, b) => String(b.data || '').localeCompare(String(a.data || '')));
+
+    renderAfazer();
+    renderFeitos();
+    renderManutencao();
+    renderAbastecimento();
+  }, () => showToast(`Erro ao carregar dados de ${secao.nome}.`, 'error'));
 
   // ── A FAZER ──────────────────────────────────
   function renderAfazer() {
     const tbody = q('tbody-afazer'); const totalEl = q('total-afazer');
-    if (afazer.length === 0) { tbody.innerHTML = `<tr><td colspan="4" class="empty-state">Nenhum item pendente.</td></tr>`; totalEl.textContent = 'R$ 0,00'; return; }
+    if (afazer.length === 0) { tbody.innerHTML = `<tr><td colspan="3" class="empty-state">Nenhum item pendente.</td></tr>`; totalEl.textContent = 'R$ 0,00'; return; }
     let total = 0;
     tbody.innerHTML = afazer.map(item => {
       total += parseFloat(item.valor) || 0;
       return `<tr>
-        <td style="text-align:center"><strong>${item.prioridade}</strong></td>
         <td>${esc(item.descricao)}</td>
         <td class="text-right">${fmtBRL(item.valor)}</td>
         <td style="text-align:center;white-space:nowrap">
@@ -710,24 +718,27 @@ function montarCarro(container, secao) {
     tbody.querySelectorAll('[data-action="edit"]').forEach(btn => btn.addEventListener('click', () => {
       const item = afazer.find(a => a.id === btn.dataset.id); if (item) abrirModalAfazer(item);
     }));
-    tbody.querySelectorAll('[data-action="delete"]').forEach(btn => btn.addEventListener('click', () => confirmarExclusaoSimples(colAfazer, btn.dataset.id, afazer)));
+    tbody.querySelectorAll('[data-action="delete"]').forEach(btn => btn.addEventListener('click', () => confirmarExclusaoSimples(colPrincipal, btn.dataset.id, afazer)));
   }
 
   function abrirModalAfazer(item) {
     const editar = !!item;
     openModal(
       editar ? 'Editar item' : 'Novo item — A Fazer',
-      `<div class="form-group"><label>Prioridade</label><input type="number" id="cx-af-prioridade" value="${editar ? item.prioridade : ''}" min="1" placeholder="1 = mais urgente"></div>
-       <div class="form-group"><label>Descrição</label><input type="text" id="cx-af-descricao" value="${editar ? esc(item.descricao) : ''}" placeholder="Ex: Trocar pneu traseiro"></div>
+      `<div class="form-group"><label>Descrição</label><input type="text" id="cx-af-descricao" value="${editar ? esc(item.descricao) : ''}" placeholder="Ex: Trocar pneu traseiro"></div>
        <div class="form-group"><label>Valor estimado (R$)</label><input type="number" id="cx-af-valor" value="${editar ? item.valor : ''}" step="0.01" min="0" placeholder="0,00"></div>`,
       async () => {
-        const prioridade = parseInt(document.getElementById('cx-af-prioridade').value);
-        const descricao  = document.getElementById('cx-af-descricao').value.trim();
+        const descricao = document.getElementById('cx-af-descricao').value.trim();
         const valor      = parseFloat(document.getElementById('cx-af-valor').value) || 0;
-        if (!descricao || isNaN(prioridade) || prioridade < 1) { showToast('Preencha prioridade e descrição.', 'error'); return; }
+        if (!descricao) { showToast('Preencha a descrição.', 'error'); return; }
         try {
-          if (editar) { await updateDoc(doc(db, colAfazer, item.id), { prioridade, descricao, valor }); showToast('Item atualizado!', 'success'); }
-          else        { await addDoc(collection(db, colAfazer), { prioridade, descricao, valor }); showToast('Item adicionado!', 'success'); }
+          if (editar) { await updateDoc(doc(db, colPrincipal, item.id), { descricao, valor }); showToast('Item atualizado!', 'success'); }
+          else {
+            const maxPrio    = afazer.length ? (afazer[afazer.length - 1].prioridade || 0) : 0;
+            const prioridade = maxPrio + 1;
+            await addDoc(collection(db, colPrincipal), { tipo: 'afazer', prioridade, descricao, valor });
+            showToast('Item adicionado!', 'success');
+          }
         } catch { showToast('Erro ao salvar.', 'error'); }
       },
       editar ? 'Salvar' : 'Adicionar'
@@ -757,7 +768,7 @@ function montarCarro(container, secao) {
     tbody.querySelectorAll('[data-action="edit"]').forEach(btn => btn.addEventListener('click', () => {
       const item = feitos.find(f => f.id === btn.dataset.id); if (item) abrirModalFeito(item);
     }));
-    tbody.querySelectorAll('[data-action="delete"]').forEach(btn => btn.addEventListener('click', () => confirmarExclusaoSimples(colFeitos, btn.dataset.id, feitos)));
+    tbody.querySelectorAll('[data-action="delete"]').forEach(btn => btn.addEventListener('click', () => confirmarExclusaoSimples(colPrincipal, btn.dataset.id, feitos)));
     const btnMais = tbody.querySelector('[data-role="btn-feitos-mais"]');
     if (btnMais) btnMais.addEventListener('click', () => { feitosVisiveis += 5; renderFeitos(); });
   }
@@ -776,8 +787,8 @@ function montarCarro(container, secao) {
         const valor     = parseFloat(document.getElementById('cx-ft-valor').value) || 0;
         if (!data || !descricao) { showToast('Preencha data e descrição.', 'error'); return; }
         try {
-          if (editar) { await updateDoc(doc(db, colFeitos, item.id), { data, descricao, valor }); showToast('Manutenção atualizada!', 'success'); }
-          else        { await addDoc(collection(db, colFeitos), { data, descricao, valor }); showToast('Manutenção registrada!', 'success'); }
+          if (editar) { await updateDoc(doc(db, colPrincipal, item.id), { data, descricao, valor }); showToast('Manutenção atualizada!', 'success'); }
+          else        { await addDoc(collection(db, colPrincipal), { tipo: 'feito', data, descricao, valor }); showToast('Manutenção registrada!', 'success'); }
         } catch { showToast('Erro ao salvar.', 'error'); }
       },
       editar ? 'Salvar' : 'Registrar'
@@ -804,7 +815,7 @@ function montarCarro(container, secao) {
     tbody.querySelectorAll('[data-action="edit"]').forEach(btn => btn.addEventListener('click', () => {
       const item = manutencao.find(m => m.id === btn.dataset.id); if (item) abrirModalManutencao(item);
     }));
-    tbody.querySelectorAll('[data-action="delete"]').forEach(btn => btn.addEventListener('click', () => confirmarExclusaoSimples(colManutencao, btn.dataset.id, manutencao)));
+    tbody.querySelectorAll('[data-action="delete"]').forEach(btn => btn.addEventListener('click', () => confirmarExclusaoSimples(colPrincipal, btn.dataset.id, manutencao)));
   }
 
   function abrirModalManutencao(item) {
@@ -825,8 +836,8 @@ function montarCarro(container, secao) {
         if (!descricao) { showToast('Preencha a descrição.', 'error'); return; }
         const payload = { descricao, data, kmUltimaTroca, kmProximaTroca, valor };
         try {
-          if (editar) { await updateDoc(doc(db, colManutencao, item.id), payload); showToast('Atualizado!', 'success'); }
-          else        { await addDoc(collection(db, colManutencao), payload); showToast('Adicionado!', 'success'); }
+          if (editar) { await updateDoc(doc(db, colPrincipal, item.id), payload); showToast('Atualizado!', 'success'); }
+          else        { await addDoc(collection(db, colPrincipal), { tipo: 'manutencao', ...payload }); showToast('Adicionado!', 'success'); }
         } catch { showToast('Erro ao salvar.', 'error'); }
       },
       editar ? 'Salvar' : 'Adicionar'
@@ -871,7 +882,7 @@ function montarCarro(container, secao) {
     tbody.querySelectorAll('[data-action="edit"]').forEach(btn => btn.addEventListener('click', () => {
       const item = abastecimento.find(a => a.id === btn.dataset.id); if (item) abrirModalAbastecimento(item);
     }));
-    tbody.querySelectorAll('[data-action="delete"]').forEach(btn => btn.addEventListener('click', () => confirmarExclusaoSimples(colAbastecimento, btn.dataset.id, abastecimento)));
+    tbody.querySelectorAll('[data-action="delete"]').forEach(btn => btn.addEventListener('click', () => confirmarExclusaoSimples(colPrincipal, btn.dataset.id, abastecimento)));
     const btnMais = tbody.querySelector('[data-role="btn-abastecimento-mais"]');
     if (btnMais) btnMais.addEventListener('click', () => { abastecimentoVisiveis += 5; renderAbastecimento(); });
   }
@@ -915,8 +926,8 @@ function montarCarro(container, secao) {
 
         const payload = { data, km, correcao, litros, valorPago, tipoCombustivel };
         try {
-          if (editar) { await updateDoc(doc(db, colAbastecimento, item.id), payload); showToast('Abastecimento atualizado!', 'success'); }
-          else        { await addDoc(collection(db, colAbastecimento), payload); showToast('Abastecimento registrado!', 'success'); }
+          if (editar) { await updateDoc(doc(db, colPrincipal, item.id), payload); showToast('Abastecimento atualizado!', 'success'); }
+          else        { await addDoc(collection(db, colPrincipal), { tipo: 'abastecimento', ...payload }); showToast('Abastecimento registrado!', 'success'); }
           if (valorPago !== null) localStorage.setItem(LS_VALOR_PAGO, String(valorPago));
         } catch { showToast('Erro ao salvar.', 'error'); }
       },

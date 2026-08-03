@@ -50,7 +50,7 @@
         </a>
       </li>
       <li>
-        <a href="#" class="nav-link" data-section="carro">
+        <a href="#" class="nav-link" data-section="focus">
           <span class="nav-icon">🚗</span>
           <span class="nav-label">Focus</span>
         </a>
@@ -177,7 +177,7 @@
           </div>
         </div>
 
-        <div class="card stat-card orcamento-duplo" data-dash-section="carro">
+        <div class="card stat-card orcamento-duplo" data-dash-section="focus">
           <div class="orcamento-item">
             <div class="stat-icon">⛽</div>
             <div class="stat-info">
@@ -426,128 +426,13 @@
     </section>
 
     <!-- ===== SECTION: CARRO ===== -->
-    <section id="section-carro" class="content-section">
+    <section id="section-focus" class="content-section">
 
       <!-- A FAZER -->
       <div class="card">
         <div class="card-header">
           <h3 class="card-title">🔧 A Fazer</h3>
           <button id="btn-add-afazer" class="btn btn-primary">+ Novo Item</button>
-        </div>
-        <table class="data-table" id="carro-afazer-table">
-          <thead>
-            <tr>
-              <th>Descrição</th>
-              <th class="text-right">Valor estimado</th>
-              <th style="width:90px"></th>
-            </tr>
-          </thead>
-          <tbody><tr><td colspan="3" class="loading">Carregando...</td></tr></tbody>
-          <tfoot>
-            <tr>
-              <td><strong>Total estimado</strong></td>
-              <td class="text-right"><strong id="carro-afazer-total">R$ 0,00</strong></td>
-              <td></td>
-            </tr>
-          </tfoot>
-        </table>
-      </div>
-
-      <!-- FEITOS -->
-      <div class="card">
-        <div class="card-header">
-          <h3 class="card-title">✅ Feitos</h3>
-          <button id="btn-add-feito" class="btn btn-primary">+ Registrar</button>
-        </div>
-        <table class="data-table" id="carro-feitos-table">
-          <thead>
-            <tr>
-              <th>Data</th>
-              <th>Descrição</th>
-              <th class="text-right">Valor</th>
-              <th style="width:60px"></th>
-            </tr>
-          </thead>
-          <tbody><tr><td colspan="4" class="loading">Carregando...</td></tr></tbody>
-          <tfoot>
-            <tr>
-              <td colspan="2"><strong>Total gasto</strong></td>
-              <td class="text-right"><strong id="carro-feitos-total">R$ 0,00</strong></td>
-              <td></td>
-            </tr>
-          </tfoot>
-        </table>
-      </div>
-
-      <!-- ABASTECIMENTO -->
-      <div class="card">
-        <div class="card-header">
-          <h3 class="card-title">⛽ Abastecimento</h3>
-          <div style="display:flex;gap:.5rem">
-            <button id="btn-tipos-combustivel" class="btn-secondary" title="Gerenciar tipos de combustível">⚙️ Tipos</button>
-            <button id="btn-add-abastecimento" class="btn btn-primary">+ Registrar</button>
-          </div>
-        </div>
-        <div class="table-wrapper">
-          <table class="data-table" id="carro-abastecimento-table">
-            <thead>
-              <tr>
-                <th>Data</th>
-                <th>KM</th>
-                <th>Litros</th>
-                <th>Combustível</th>
-                <th class="text-right">Valor/L</th>
-                <th class="text-right">km/L</th>
-                <th class="text-right">R$/km</th>
-                <th style="width:60px"></th>
-              </tr>
-            </thead>
-            <tbody><tr><td colspan="8" class="loading">Carregando...</td></tr></tbody>
-          </table>
-        </div>
-      </div>
-
-      <!-- MANUTENÇÃO PREVENTIVA -->
-      <div class="card">
-        <div class="card-header">
-          <h3 class="card-title">📅 Manutenção Preventiva</h3>
-          <button id="btn-add-manutencao" class="btn btn-primary">+ Adicionar</button>
-        </div>
-        <div class="table-wrapper">
-          <table class="data-table" id="carro-manutencao-table">
-            <thead>
-              <tr>
-                <th>Descrição</th>
-                <th>Última troca</th>
-                <th>KM última</th>
-                <th>KM próxima</th>
-                <th class="text-right">Valor Estimado</th>
-                <th style="width:90px"></th>
-              </tr>
-            </thead>
-            <tbody><tr><td colspan="6" class="loading">Carregando...</td></tr></tbody>
-          </table>
-        </div>
-      </div>
-
-      <div class="notas-card">
-        <div class="notas-header">
-          <span class="notas-icon">📝</span>
-          <span class="notas-title">Anotações</span>
-          <span class="notas-status" id="notas-status-carro"></span>
-        </div>
-        <textarea class="notas-textarea" id="notas-carro" placeholder="Deixe recados sobre o carro…"></textarea>
-      </div>
-    </section>
-
-    <!-- ===== SECTION: FOCUS ===== -->
-    <section id="section-face" class="content-section">
-
-      <!-- A FAZER -->
-      <div class="card">
-        <div class="card-header">
-          <h3 class="card-title">🔧 A Fazer</h3>
-          <button id="btn-add-afazer-focus" class="btn btn-primary">+ Novo Item</button>
         </div>
         <table class="data-table" id="focus-afazer-table">
           <thead>
@@ -572,7 +457,7 @@
       <div class="card">
         <div class="card-header">
           <h3 class="card-title">✅ Feitos</h3>
-          <button id="btn-add-feito-focus" class="btn btn-primary">+ Registrar</button>
+          <button id="btn-add-feito" class="btn btn-primary">+ Registrar</button>
         </div>
         <table class="data-table" id="focus-feitos-table">
           <thead>
@@ -599,8 +484,8 @@
         <div class="card-header">
           <h3 class="card-title">⛽ Abastecimento</h3>
           <div style="display:flex;gap:.5rem">
-            <button id="btn-tipos-combustivel-focus" class="btn-secondary" title="Gerenciar tipos de combustível">⚙️ Tipos</button>
-            <button id="btn-add-abastecimento-focus" class="btn btn-primary">+ Registrar</button>
+            <button id="btn-tipos-combustivel" class="btn-secondary" title="Gerenciar tipos de combustível">⚙️ Tipos</button>
+            <button id="btn-add-abastecimento" class="btn btn-primary">+ Registrar</button>
           </div>
         </div>
         <div class="table-wrapper">
@@ -626,7 +511,7 @@
       <div class="card">
         <div class="card-header">
           <h3 class="card-title">📅 Manutenção Preventiva</h3>
-          <button id="btn-add-manutencao-focus" class="btn btn-primary">+ Adicionar</button>
+          <button id="btn-add-manutencao" class="btn btn-primary">+ Adicionar</button>
         </div>
         <div class="table-wrapper">
           <table class="data-table" id="focus-manutencao-table">
@@ -649,9 +534,124 @@
         <div class="notas-header">
           <span class="notas-icon">📝</span>
           <span class="notas-title">Anotações</span>
+          <span class="notas-status" id="notas-status-focus"></span>
+        </div>
+        <textarea class="notas-textarea" id="notas-focus" placeholder="Deixe recados sobre o Focus…"></textarea>
+      </div>
+    </section>
+
+    <!-- ===== SECTION: FACE ===== -->
+    <section id="section-face" class="content-section">
+
+      <!-- A FAZER -->
+      <div class="card">
+        <div class="card-header">
+          <h3 class="card-title">🔧 A Fazer</h3>
+          <button id="btn-add-afazer-face" class="btn btn-primary">+ Novo Item</button>
+        </div>
+        <table class="data-table" id="face-afazer-table">
+          <thead>
+            <tr>
+              <th>Descrição</th>
+              <th class="text-right">Valor estimado</th>
+              <th style="width:90px"></th>
+            </tr>
+          </thead>
+          <tbody><tr><td colspan="3" class="loading">Carregando...</td></tr></tbody>
+          <tfoot>
+            <tr>
+              <td><strong>Total estimado</strong></td>
+              <td class="text-right"><strong id="face-afazer-total">R$ 0,00</strong></td>
+              <td></td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+
+      <!-- FEITOS -->
+      <div class="card">
+        <div class="card-header">
+          <h3 class="card-title">✅ Feitos</h3>
+          <button id="btn-add-feito-face" class="btn btn-primary">+ Registrar</button>
+        </div>
+        <table class="data-table" id="face-feitos-table">
+          <thead>
+            <tr>
+              <th>Data</th>
+              <th>Descrição</th>
+              <th class="text-right">Valor</th>
+              <th style="width:60px"></th>
+            </tr>
+          </thead>
+          <tbody><tr><td colspan="4" class="loading">Carregando...</td></tr></tbody>
+          <tfoot>
+            <tr>
+              <td colspan="2"><strong>Total gasto</strong></td>
+              <td class="text-right"><strong id="face-feitos-total">R$ 0,00</strong></td>
+              <td></td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+
+      <!-- ABASTECIMENTO -->
+      <div class="card">
+        <div class="card-header">
+          <h3 class="card-title">⛽ Abastecimento</h3>
+          <div style="display:flex;gap:.5rem">
+            <button id="btn-tipos-combustivel-face" class="btn-secondary" title="Gerenciar tipos de combustível">⚙️ Tipos</button>
+            <button id="btn-add-abastecimento-face" class="btn btn-primary">+ Registrar</button>
+          </div>
+        </div>
+        <div class="table-wrapper">
+          <table class="data-table" id="face-abastecimento-table">
+            <thead>
+              <tr>
+                <th>Data</th>
+                <th>KM</th>
+                <th>Litros</th>
+                <th>Combustível</th>
+                <th class="text-right">Valor/L</th>
+                <th class="text-right">km/L</th>
+                <th class="text-right">R$/km</th>
+                <th style="width:60px"></th>
+              </tr>
+            </thead>
+            <tbody><tr><td colspan="8" class="loading">Carregando...</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- MANUTENÇÃO PREVENTIVA -->
+      <div class="card">
+        <div class="card-header">
+          <h3 class="card-title">📅 Manutenção Preventiva</h3>
+          <button id="btn-add-manutencao-face" class="btn btn-primary">+ Adicionar</button>
+        </div>
+        <div class="table-wrapper">
+          <table class="data-table" id="face-manutencao-table">
+            <thead>
+              <tr>
+                <th>Descrição</th>
+                <th>Última troca</th>
+                <th>KM última</th>
+                <th>KM próxima</th>
+                <th class="text-right">Valor Estimado</th>
+                <th style="width:90px"></th>
+              </tr>
+            </thead>
+            <tbody><tr><td colspan="6" class="loading">Carregando...</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="notas-card">
+        <div class="notas-header">
+          <span class="notas-icon">📝</span>
+          <span class="notas-title">Anotações</span>
           <span class="notas-status" id="notas-status-face"></span>
         </div>
-        <textarea class="notas-textarea" id="notas-face" placeholder="Deixe recados sobre o Focus…"></textarea>
+        <textarea class="notas-textarea" id="notas-face" placeholder="Deixe recados sobre o Face…"></textarea>
       </div>
     </section>
 
