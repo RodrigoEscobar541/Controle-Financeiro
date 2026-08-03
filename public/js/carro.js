@@ -3,6 +3,8 @@
  *
  * Estrutura Firestore:
  *   carro_afazer         { prioridade, descricao, valor }
+ *     prioridade é interno e não aparece na UI — só define ordem de registro
+ *     (item novo entra com prioridade = maior atual + 1, ou seja, no fim da fila).
  *   carro_feitos         { data: "YYYY-MM-DD", descricao, valor }
  *   carro_manutencao     { descricao, data: "YYYY-MM-DD", kmUltimaTroca, kmProximaTroca, valor }
  *   carro_abastecimento  { data: "YYYY-MM-DD", km, correcao, litros, valorPago (preço por litro, não o total), tipoCombustivel }
@@ -84,7 +86,7 @@ function renderAfazer() {
   const totalEl = document.getElementById('carro-afazer-total');
 
   if (afazer.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="4" class="empty-state">Nenhum item pendente.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="3" class="empty-state">Nenhum item pendente.</td></tr>`;
     totalEl.textContent = 'R$ 0,00';
     return;
   }
@@ -93,7 +95,6 @@ function renderAfazer() {
   tbody.innerHTML = afazer.map(item => {
     total += parseFloat(item.valor) || 0;
     return `<tr>
-      <td style="text-align:center"><strong>${item.prioridade}</strong></td>
       <td>${esc(item.descricao)}</td>
       <td class="text-right">${fmtBRL(item.valor)}</td>
       <td style="text-align:center;white-space:nowrap">
@@ -121,10 +122,6 @@ function abrirModalAfazer(item) {
   openModal(
     editar ? 'Editar item' : 'Novo item — A Fazer',
     `<div class="form-group">
-       <label>Prioridade</label>
-       <input type="number" id="af-prioridade" value="${editar ? item.prioridade : ''}" min="1" placeholder="1 = mais urgente">
-     </div>
-     <div class="form-group">
        <label>Descrição</label>
        <input type="text" id="af-descricao" value="${editar ? esc(item.descricao) : ''}" placeholder="Ex: Trocar pneu traseiro">
      </div>
@@ -133,18 +130,19 @@ function abrirModalAfazer(item) {
        <input type="number" id="af-valor" value="${editar ? item.valor : ''}" step="0.01" min="0" placeholder="0,00">
      </div>`,
     async () => {
-      const prioridade = parseInt(document.getElementById('af-prioridade').value);
-      const descricao  = document.getElementById('af-descricao').value.trim();
+      const descricao = document.getElementById('af-descricao').value.trim();
       const valor      = parseFloat(document.getElementById('af-valor').value) || 0;
 
-      if (!descricao || isNaN(prioridade) || prioridade < 1) {
-        showToast('Preencha prioridade e descrição.', 'error'); return;
+      if (!descricao) {
+        showToast('Preencha a descrição.', 'error'); return;
       }
       try {
         if (editar) {
-          await updateDoc(doc(db, 'carro_afazer', item.id), { prioridade, descricao, valor });
+          await updateDoc(doc(db, 'carro_afazer', item.id), { descricao, valor });
           showToast('Item atualizado!', 'success');
         } else {
+          const maxPrio    = afazer.length ? (afazer[afazer.length - 1].prioridade || 0) : 0;
+          const prioridade = maxPrio + 1;
           await addDoc(collection(db, 'carro_afazer'), { prioridade, descricao, valor });
           showToast('Item adicionado!', 'success');
         }
