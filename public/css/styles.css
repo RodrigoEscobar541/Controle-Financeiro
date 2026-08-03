@@ -667,6 +667,16 @@ body.modal-open {
 
 .spreadsheet th .delete-col-btn:hover { opacity: 1; }
 
+.spreadsheet th .edit-col-btn {
+  display: inline-block;
+  margin-left: 0.4rem;
+  cursor: pointer;
+  font-size: 0.75rem;
+  opacity: 0.5;
+}
+
+.spreadsheet th .edit-col-btn:hover { opacity: 1; }
+
 .spreadsheet .col-total { font-weight: 700; }
 
 /* Coluna calculada "Equilíbrio de contas": só checável (segurar 1s → verde) */
