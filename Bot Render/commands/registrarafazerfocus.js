@@ -32,7 +32,7 @@ module.exports = async (ctx, db) => {
 
     const valorFmt = valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
     ctx.reply(
-      `✅ *A Fazer Focus adicionado!*\n📝 ${descricao}\n💰 ${valorFmt}\n🔢 Prioridade: ${prioridade} (fim da fila)`,
+      `✅ *A Fazer Focus adicionado!*\n📝 ${descricao}\n💰 ${valorFmt}`,
       { parse_mode: 'Markdown' }
     );
   } catch (err) {
