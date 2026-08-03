@@ -1,66 +1,226 @@
-Atue como um profissional em arquitetura de Banco de dados com alto conhecimento em firestore. Temos o limite de 50k de leituras por dias, e 20k de gravação e 20k de exclusões.
-O foco é não deixar passar desses 50k
-E Manter o sistema atomico e sem falhas
-Todas as query devem ser carregadas para melhorar a experiencia do usuario
+# Arquitetura do Banco de Dados (Firestore)
 
-## Dados section Dashboard:
-- Para pegar as ultimas 5 saidas, a query deve procurar as ultimas 5 saidas pela data na coleção "Banco" com limit(5) para não gastar Leitura
-- Para pegar as ultimas 5 Entradas, a query deve procurar as ultimas 5 Entradas pela data na coleção "Banco" com limit(5) para não gastar Leitura
-- Pega o resultado da coluna "total" na section "Distribuição Mensal" referente ao mes atual
-- Pega o dado da coluna "total" na section "Contas casa" referente ao mes atual
-- Pega o total dos valores de cada documento na coleção "Patrimonio"
+Limites do plano gratuito: 50k leituras/dia, 20k gravações/dia, 20k exclusões/dia.
+O foco é não deixar passar desses números, manter o sistema atômico (sem
+estados inconsistentes) e carregar tudo o que a interface precisa de uma vez
+(evitar paginação desnecessária que gera mais idas ao banco).
 
-## Dados Section Entrada e saída:
-- Coleção "Banco"
-- Gere um documento com codigo aleatorio com os campos:
-    Data: "xx-xx-xxxx" (Autocomplete)
-    Tipo: "Saida" (Vem do input=radio do html) (Usuario preenche)
-    Valor: "100" (Usuario preenche)
-    Descrição: "cinema" (Usuario preenche)
+Este documento descreve as coleções que **realmente existem hoje** no projeto
+e, mais importante, a **convenção que deve ser seguida em qualquer alteração
+futura de banco de dados** — leia a seção "Convenção para futuras alterações"
+antes de criar uma coleção nova.
 
-- Outro documento:
-    Data: "xx-xx-xxxx" (Autocomplete)
-    Tipo: "Entrada" (Vem do input=radio do html) (Usuario preenche)
-    Valor: "150" (Usuario preenche)
-    Descrição: "paga" (Usuario preenche)
+---
 
-## Dados Section Patrimonio:
-- Coleção "Patrimonio"
-- Gere um documento com codigo aleatorio com os campos:
-    NomeDoAtivo: "BTC" (usuario preenche)
-    Plataforma: "Mercado Bitcoin" (usuario preenche)
-    Valor: "2,180" (usuario preenche)
-- O usuario atualizara esses campos se achar necessario
+## Convenção para futuras alterações (leia antes de mexer no BD)
 
+**Regra principal: 1 coleção por section.**
 
-## Dados Section Distribuição Mensal:
-- Coleção "Distribuição Mensal"
-- Gere um documento com codigo aleatorio com os campos:
-    dataMes: "xx-xxxx" (autocomplete)
-    ColunaName: "Seguro cartao MP" (usuario preenche ao abrir a coluna)
-    Valor: "5,99" (usuario preenche)
-    Status "Pago" (preenchido como verde como diz em @Estrutura do sistema.md) (usuario Atualiza)
+Quando uma section guarda vários "tipos" de registro relacionados (ex.: a
+section Focus tem pendências, gastos feitos, manutenções e abastecimentos),
+**não crie uma coleção separada por tipo**. Em vez disso, use **uma única
+coleção** com um campo discriminador `tipo` (string) dentro de cada documento,
+e guarde em cada documento só os campos que fazem sentido para aquele `tipo`.
+É o mesmo padrão já usado em `banco` (`tipo: "Entrada"|"Saida"`) e em `dividas`
+(`tipo: "Devo"|"Devem"`), e é o padrão que as sections Focus/Face passaram a
+seguir (ver coleções `focus`/`face` abaixo) depois de começarem com 4
+coleções cada uma — o que gerava bagunça e duplicação de lógica.
 
-- Outro documento:
-    dataMes: "xx-xxxx" (autocomplete)
-    Coluna: "HBO" (usuario preenche ao abrir a coluna)
-    Valor: "14" (usuario preenche)
-    Status: "naoPago" (usuario Atualiza)
+**Exceção: coleções de configuração.** Um doc de config que define metadados
+(ex.: `config/distribuicao_colunas` guarda a lista de colunas da Distribuição
+Mensal; `config/contas_casa_colunas` guarda quem paga cada conta por padrão)
+é um padrão diferente e pode ficar separado da coleção de dados
+transacionais — isso não é a mesma bagunça do "1 coleção por tipo", é
+config vs. dado.
 
+**Ao criar uma nova section fixa ou um novo template de section customizada
+(`public/js/section-templates.js`):**
+1. Defina `buildColecoes` retornando **1 chave** (`{ principal: slug }`),
+   a menos que exista uma real necessidade de separar dado transacional de
+   config (como em `distribuicao`, que usa `{ mensal, colunasConfig }`).
+2. Se a section tiver sub-tipos de registro, use um campo `tipo` nos
+   documentos da coleção `principal`, nunca uma coleção por tipo.
+3. Ao escrever queries que misturam `where('tipo','==', X)` com `orderBy`
+   num campo diferente (ex.: `data`), prefira **filtrar/ordenar em
+   JavaScript** depois de um `onSnapshot`/`get()` simples na coleção inteira,
+   em vez de depender de um índice composto do Firestore — mais simples de
+   manter (nenhum índice para configurar) e, na escala pessoal deste app,
+   o custo de leitura extra é desprezível.
 
-## Dados da section Contas casa:
-- Coleção "Contas casa"
-- Gera um documnto com codigo aleatorio com os campos:
-    dataMes: "xx-xxxx" (autocomplete)
-    Pagante: "Bella" (usuario escolhe)
-    ColunaName: "Mercado" (usuario preenche)
-    Valor: "180.54" (usuario preenche)
-    Status: "Pago" (preenchido como verde como diz em @Estrutura do sistema.md) (usuario Atualiza)
+---
 
-- Outro documento:
-    dataMes: "xx-xxxx" (autocomplete)
-    Pagante: "Digo" (usuario escolhe)
-    Coluna: "Luz" (usuario preenche)
-    Valor: "180.54" (usuario preenche)
-    Status: "naoPago" (usuario Atualiza)
+## Coleções em uso hoje
 
+### `banco`
+Transações financeiras (Mercado Pago). Um documento por lançamento.
+```
+{id_aleatorio}: {
+  data:      "2026-06-23",     // YYYY-MM-DD
+  tipo:      "Entrada"|"Saida",
+  valor:     1500.00,
+  descricao: "Salário"
+}
+```
+
+### `patrimonio`
+Ativos e investimentos.
+```
+{id_aleatorio}: {
+  nomeDoAtivo:      "BTC",
+  plataforma:       "Mercado Bitcoin",   // exibido como "Descrição"
+  tipoInvestimento: "Criptomoeda",       // nome de uma divisão (patrimonioDivisoes)
+  valor:            2180.00
+}
+```
+
+### `patrimonioDivisoes`
+Divisões do gráfico pizza da section Patrimônio (config/apoio, não é a mesma
+bagunça do "1 coleção por tipo": é uma lista de categorias referenciada pelo
+campo `tipoInvestimento` de `patrimonio`, não um sub-tipo de ativo).
+```
+{id_aleatorio}: { nome: "Criptomoeda", cor: "#EF6C00" }
+```
+
+### `distribuicao_mensal`
+Distribuição mensal do salário. Um documento por mês (`YYYY-MM`).
+```
+"2026-06": {
+  dataMes: "06-2026",
+  colunas: {
+    "HBO":    { valor: 14.00, status: "naoPago" },
+    "Seguro": { valor: 5.99,  status: "Pago"    }
+  }
+}
+```
+
+### `contas_casa`
+Contas domésticas. Um documento por mês (`YYYY-MM`).
+```
+"2026-06": {
+  dataMes: "06-2026",
+  colunas: {
+    "Mercado": { valor: 180.54, status: "Pago",    pagante: "Digo"  },
+    "Luz":     { valor: 120.00, status: "naoPago", pagante: "Bella" }
+  }
+}
+```
+
+### `focus` (section Focus — Ford Focus) / `face` (section Face — outro carro)
+1 coleção por carro. Um documento por registro, diferenciado pelo campo
+`tipo`. É o exemplo concreto da convenção acima: antes eram 4 coleções por
+carro (`*_afazer`, `*_feitos`, `*_manutencao`, `*_abastecimento`) — foram
+consolidadas numa só.
+```
+focus/{id}  ou  face/{id}:
+
+  tipo: "afazer"
+    prioridade: 1        // definida automaticamente (maior atual + 1 = fim da fila),
+                          // NUNCA pedida ao usuário — não aparece na UI
+    descricao:  "Trocar pneu traseiro"
+    valor:      450.00
+
+  tipo: "feito"
+    data:      "2026-06-10"   // YYYY-MM-DD
+    descricao: "Troca de óleo"
+    valor:     180.00
+
+  tipo: "manutencao"
+    descricao:      "Troca de óleo"
+    data:           "2026-05-01"   // data da última troca
+    kmUltimaTroca:  "52.400 km"
+    kmProximaTroca: "57.400 km"
+    valor:          180.00
+
+  tipo: "abastecimento"
+    data:            "2026-07-02"
+    km:              350     // km rodado NESTE tanque, não é odômetro acumulado
+    correcao:        10      // % a descontar do km informado (painel/GPS superestimado)
+    litros:          30
+    valorPago:       6.19    // preço POR LITRO (não o total); opcional, pode ser null
+    tipoCombustivel: "Gasolina"
+```
+Sections customizadas criadas a partir do template "Novo Carro" seguem o
+mesmo esquema (1 coleção = `secao.colecoes.principal`, campo `tipo`).
+
+### `combustivel_tipos`
+Tipos de combustível cadastrados, compartilhada entre Focus e Face (e
+qualquer section customizada do template "carro"). Vem com Gasolina, Etanol
+e Diesel; o usuário pode cadastrar outros (ex.: GNV).
+```
+{id_aleatorio}: { nome: "Gasolina" }
+```
+
+### `dividas`
+Devo/Devem. Um documento por parcela.
+```
+{id_aleatorio}: {
+  tipo:      "Devo"|"Devem",
+  data:      "06-2026",       // MM-YYYY
+  descricao: "Empréstimo Nubank (2/6)",
+  valor:     150.00,
+  status:    "Aberta"|"Paga"
+}
+```
+
+### `secoes_customizadas`
+Sections criadas pelo usuário (botão "+ Nova Section" ou pelo Agente IA).
+```
+{id_aleatorio}: {
+  nome, slug, template ("banco"|"distribuicao"|"patrimonio"|"carro"|"devo-devem"),
+  icone, colecoes: {...},          // formato depende do template — ver section-templates.js
+  criadoEm, origem: "web"|"agente",
+  ativo: true|false, excluidoEm: null|ISOString
+}
+```
+Excluir uma section **nunca apaga dados**: uma section fixa só ganha uma
+entrada em `config/secoes_ocultas`; uma customizada só tem `ativo` marcado
+`false` — em ambos os casos a coleção/dados de origem continuam intactos.
+
+### `config`
+Configurações dinâmicas.
+```
+"distribuicao_colunas": { colunas: ["HBO","Netflix","Seguro",...] }
+"contas_casa_colunas":  { colunas: { "Mercado": { defaultPagante:"Digo" }, ... }, ordem: [...] }
+"secoes_ocultas":       { nomes: ["banco","distribuicao","patrimonio","contas-casa","focus","face","devo-devem"] }
+                        // chaves das sections FIXAS que o usuário ocultou; "dashboard" nunca entra aqui
+```
+
+### `sistema`
+Estado interno. Doc `status_bot` = heartbeat do bot (escrito a cada ~1 min
+pelo próprio bot; o dashboard só lê para o selo online/offline).
+```
+"status_bot": {
+  atualizado_em: "2026-07-18T21:00:00.000Z",
+  iniciado_em:   "2026-07-18T20:31:00.000Z",
+  versao:        "1.0.0"
+}
+```
+
+### `notas`
+Anotações livres por section. Um documento por chave de section (a mesma
+chave usada em `data-section` no HTML / `secoes_ocultas`; sections
+customizadas usam `custom-{slug}`).
+```
+"focus": { texto: "Lembrar de levar pro alinhamento em julho" }
+```
+
+### `agente_log`
+Registro automático de cada interação do Agente IA (mensagem do usuário,
+resposta e lista de ações realizadas no BD — leituras, escritas, exclusões).
+Ver `Agente_Financeiro_IA.md`.
+
+---
+
+## Dados por section (referência rápida de UI → BD)
+
+- **Dashboard:** últimas 5 saídas/entradas de `banco` (`limit(5)`); total do
+  mês atual de `distribuicao_mensal` e `contas_casa`; soma de `patrimonio`.
+- **Banco:** um documento por lançamento em `banco`.
+- **Patrimônio:** um documento por ativo em `patrimonio`; divisões do gráfico
+  em `patrimonioDivisoes`.
+- **Distribuição Mensal:** um documento por mês em `distribuicao_mensal`;
+  colunas definidas em `config/distribuicao_colunas`.
+- **Contas Casa:** um documento por mês em `contas_casa`; colunas definidas
+  em `config/contas_casa_colunas`.
+- **Focus / Face:** ver coleções `focus`/`face` acima.
+- **Devo/Devem:** um documento por parcela em `dividas`.

@@ -2,31 +2,35 @@
  * Focus
  *
  * Estrutura Firestore:
- *   focus_afazer         { prioridade, descricao, valor }
- *     prioridade é interno e não aparece na UI — só define ordem de registro
- *     (item novo entra com prioridade = maior atual + 1, ou seja, no fim da fila).
- *   focus_feitos         { data: "YYYY-MM-DD", descricao, valor }
- *   focus_manutencao     { descricao, data: "YYYY-MM-DD", kmUltimaTroca, kmProximaTroca, valor }
- *   focus_abastecimento  { data: "YYYY-MM-DD", km, correcao, litros, valorPago (preço por litro, não o total), tipoCombustivel }
+ *   Coleção: focus/{id}
+ *     Um documento por registro, diferenciado pelo campo `tipo`:
+ *       tipo:'afazer'        { prioridade, descricao, valor }
+ *       tipo:'feito'         { data: "YYYY-MM-DD", descricao, valor }
+ *       tipo:'manutencao'    { descricao, data: "YYYY-MM-DD", kmUltimaTroca, kmProximaTroca, valor }
+ *       tipo:'abastecimento' { data: "YYYY-MM-DD", km, correcao, litros, valorPago (preço por litro, não o total), tipoCombustivel }
+ *
+ *   prioridade (só em tipo:'afazer') é interno e não aparece na UI — só define
+ *   ordem de registro (item novo entra com prioridade = maior atual + 1).
  */
 
 import { db } from './firebase-config.js';
 import { fmtBRL, fmtDate, showToast, openModal } from './app.js';
 import { subscribeTiposCombustivel, adicionarTipoCombustivel, abrirModalGerenciarTipos } from './combustivel-tipos.js';
 import {
-  collection, query, orderBy, where, onSnapshot,
+  collection, onSnapshot,
   addDoc, deleteDoc, updateDoc, doc
 } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
 
-let afazer               = [];
-let feitos               = [];
-let manutencao           = [];
-let abastecimento        = [];
-let tiposCombustivel     = [];
-let unsubs               = [];
-let feitosVisiveis       = 5;
+let docsRaw               = [];
+let afazer                = [];
+let feitos                = [];
+let manutencao            = [];
+let abastecimento         = [];
+let tiposCombustivel      = [];
+let unsubDados            = null;
+let feitosVisiveis        = 5;
 let abastecimentoVisiveis = 1;
-let mostrarAntigos       = false;
+let mostrarAntigos        = false;
 
 const LS_VALOR_PAGO = 'tf_valorPago_focus';
 
@@ -37,46 +41,48 @@ function corteUmAno() {
 }
 
 export function initFocus() {
-  document.getElementById('btn-add-afazer-focus').addEventListener('click',     () => abrirModalAfazer());
-  document.getElementById('btn-add-feito-focus').addEventListener('click',      () => abrirModalFeito());
-  document.getElementById('btn-add-manutencao-focus').addEventListener('click', () => abrirModalManutencao());
-  document.getElementById('btn-add-abastecimento-focus').addEventListener('click', () => abrirModalAbastecimento());
-  document.getElementById('btn-tipos-combustivel-focus').addEventListener('click', () => abrirModalGerenciarTipos(tiposCombustivel));
+  document.getElementById('btn-add-afazer').addEventListener('click',     () => abrirModalAfazer());
+  document.getElementById('btn-add-feito').addEventListener('click',      () => abrirModalFeito());
+  document.getElementById('btn-add-manutencao').addEventListener('click', () => abrirModalManutencao());
+  document.getElementById('btn-add-abastecimento').addEventListener('click', () => abrirModalAbastecimento());
+  document.getElementById('btn-tipos-combustivel').addEventListener('click', () => abrirModalGerenciarTipos(tiposCombustivel));
   subscribeTiposCombustivel(lista => { tiposCombustivel = lista; });
   subscribeAll();
 }
 
 function subscribeAll() {
-  unsubs.forEach(u => u());
-  unsubs = [];
+  if (unsubDados) unsubDados();
+  unsubDados = onSnapshot(
+    collection(db, 'focus'),
+    snap => {
+      docsRaw = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      recalcular();
+    },
+    () => showToast('Erro ao carregar dados do Focus.', 'error')
+  );
+}
 
-  unsubs.push(onSnapshot(
-    query(collection(db, 'focus_afazer'), orderBy('prioridade', 'asc')),
-    snap => { afazer = snap.docs.map(d => ({ id: d.id, ...d.data() })); renderAfazer(); },
-    () => showToast('Erro ao carregar A Fazer.', 'error')
-  ));
+function recalcular() {
+  afazer = docsRaw
+    .filter(d => d.tipo === 'afazer')
+    .sort((a, b) => (parseFloat(a.prioridade) || 0) - (parseFloat(b.prioridade) || 0));
 
-  const feitosConstraints = [];
-  if (!mostrarAntigos) feitosConstraints.push(where('data', '>=', corteUmAno()));
-  feitosConstraints.push(orderBy('data', 'desc'));
+  const corte = mostrarAntigos ? null : corteUmAno();
+  feitos = docsRaw
+    .filter(d => d.tipo === 'feito')
+    .filter(d => !corte || (d.data || '') >= corte)
+    .sort((a, b) => String(b.data || '').localeCompare(String(a.data || '')));
 
-  unsubs.push(onSnapshot(
-    query(collection(db, 'focus_feitos'), ...feitosConstraints),
-    snap => { feitos = snap.docs.map(d => ({ id: d.id, ...d.data() })); renderFeitos(); },
-    () => showToast('Erro ao carregar Feitos.', 'error')
-  ));
+  manutencao = docsRaw.filter(d => d.tipo === 'manutencao');
 
-  unsubs.push(onSnapshot(
-    collection(db, 'focus_manutencao'),
-    snap => { manutencao = snap.docs.map(d => ({ id: d.id, ...d.data() })); renderManutencao(); },
-    () => showToast('Erro ao carregar Manutenção.', 'error')
-  ));
+  abastecimento = docsRaw
+    .filter(d => d.tipo === 'abastecimento')
+    .sort((a, b) => String(b.data || '').localeCompare(String(a.data || '')));
 
-  unsubs.push(onSnapshot(
-    query(collection(db, 'focus_abastecimento'), orderBy('data', 'desc')),
-    snap => { abastecimento = snap.docs.map(d => ({ id: d.id, ...d.data() })); renderAbastecimento(); },
-    () => showToast('Erro ao carregar Abastecimento.', 'error')
-  ));
+  renderAfazer();
+  renderFeitos();
+  renderManutencao();
+  renderAbastecimento();
 }
 
 // ── A FAZER ───────────────────────────────────────────────────────────────────
@@ -113,7 +119,7 @@ function renderAfazer() {
     });
   });
   tbody.querySelectorAll('[data-action="delete"]').forEach(btn => {
-    btn.addEventListener('click', () => excluirItem('focus_afazer', btn.dataset.id, afazer));
+    btn.addEventListener('click', () => excluirItem(btn.dataset.id, afazer));
   });
 }
 
@@ -138,12 +144,12 @@ function abrirModalAfazer(item) {
       }
       try {
         if (editar) {
-          await updateDoc(doc(db, 'focus_afazer', item.id), { descricao, valor });
+          await updateDoc(doc(db, 'focus', item.id), { descricao, valor });
           showToast('Item atualizado!', 'success');
         } else {
           const maxPrio    = afazer.length ? (afazer[afazer.length - 1].prioridade || 0) : 0;
           const prioridade = maxPrio + 1;
-          await addDoc(collection(db, 'focus_afazer'), { prioridade, descricao, valor });
+          await addDoc(collection(db, 'focus'), { tipo: 'afazer', prioridade, descricao, valor });
           showToast('Item adicionado!', 'success');
         }
       } catch { showToast('Erro ao salvar.', 'error'); }
@@ -203,7 +209,7 @@ function renderFeitos() {
     });
   });
   tbody.querySelectorAll('[data-action="delete"]').forEach(btn => {
-    btn.addEventListener('click', () => excluirItem('focus_feitos', btn.dataset.id, feitos));
+    btn.addEventListener('click', () => excluirItem(btn.dataset.id, feitos));
   });
 
   const btnMais = document.getElementById('btn-feitos-mais-focus');
@@ -216,7 +222,7 @@ function renderFeitos() {
     btnAntigos.addEventListener('click', () => {
       mostrarAntigos = true;
       feitosVisiveis = 5;
-      subscribeAll();
+      recalcular();
     });
   }
 }
@@ -248,10 +254,10 @@ function abrirModalFeito(item) {
       }
       try {
         if (editar) {
-          await updateDoc(doc(db, 'focus_feitos', item.id), { data, descricao, valor });
+          await updateDoc(doc(db, 'focus', item.id), { data, descricao, valor });
           showToast('Manutenção atualizada!', 'success');
         } else {
-          await addDoc(collection(db, 'focus_feitos'), { data, descricao, valor });
+          await addDoc(collection(db, 'focus'), { tipo: 'feito', data, descricao, valor });
           showToast('Manutenção registrada!', 'success');
         }
       } catch { showToast('Erro ao salvar.', 'error'); }
@@ -291,7 +297,7 @@ function renderManutencao() {
     });
   });
   tbody.querySelectorAll('[data-action="delete"]').forEach(btn => {
-    btn.addEventListener('click', () => excluirItem('focus_manutencao', btn.dataset.id, manutencao));
+    btn.addEventListener('click', () => excluirItem(btn.dataset.id, manutencao));
   });
 }
 
@@ -331,10 +337,10 @@ function abrirModalManutencao(item) {
       const payload = { descricao, data, kmUltimaTroca, kmProximaTroca, valor };
       try {
         if (editar) {
-          await updateDoc(doc(db, 'focus_manutencao', item.id), payload);
+          await updateDoc(doc(db, 'focus', item.id), payload);
           showToast('Atualizado!', 'success');
         } else {
-          await addDoc(collection(db, 'focus_manutencao'), payload);
+          await addDoc(collection(db, 'focus'), { tipo: 'manutencao', ...payload });
           showToast('Adicionado!', 'success');
         }
       } catch { showToast('Erro ao salvar.', 'error'); }
@@ -401,7 +407,7 @@ function renderAbastecimento() {
     });
   });
   tbody.querySelectorAll('[data-action="delete"]').forEach(btn => {
-    btn.addEventListener('click', () => excluirItem('focus_abastecimento', btn.dataset.id, abastecimento));
+    btn.addEventListener('click', () => excluirItem(btn.dataset.id, abastecimento));
   });
 
   const btnMais = document.getElementById('btn-abastecimento-mais-focus');
@@ -479,10 +485,10 @@ function abrirModalAbastecimento(item) {
       const payload = { data, km, correcao, litros, valorPago, tipoCombustivel };
       try {
         if (editar) {
-          await updateDoc(doc(db, 'focus_abastecimento', item.id), payload);
+          await updateDoc(doc(db, 'focus', item.id), payload);
           showToast('Abastecimento atualizado!', 'success');
         } else {
-          await addDoc(collection(db, 'focus_abastecimento'), payload);
+          await addDoc(collection(db, 'focus'), { tipo: 'abastecimento', ...payload });
           showToast('Abastecimento registrado!', 'success');
         }
         if (valorPago !== null) localStorage.setItem(LS_VALOR_PAGO, String(valorPago));
@@ -500,14 +506,14 @@ function abrirModalAbastecimento(item) {
 
 // ── HELPERS ───────────────────────────────────────────────────────────────────
 
-function excluirItem(colecao, id, lista) {
+function excluirItem(id, lista) {
   const nome = lista.find(i => i.id === id)?.descricao || 'este item';
   openModal(
     'Excluir item',
     `<p>Deseja excluir <strong>${esc(nome)}</strong>? Esta ação não pode ser desfeita.</p>`,
     async () => {
       try {
-        await deleteDoc(doc(db, colecao, id));
+        await deleteDoc(doc(db, 'focus', id));
         showToast('Item excluído.', 'success');
       } catch { showToast('Erro ao excluir.', 'error'); }
     },

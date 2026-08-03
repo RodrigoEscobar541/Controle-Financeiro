@@ -1,7 +1,7 @@
 /**
  * /registrargastosface [descrição] [valor]
  * Exemplo: /registrargastosface troca de pastilha 180
- * Registra na coleção focus_feitos (section Face)
+ * Registra na coleção face (tipo:'feito', section Face)
  */
 
 module.exports = async (ctx, db) => {
@@ -26,7 +26,7 @@ module.exports = async (ctx, db) => {
   const data      = `${hoje.getFullYear()}-${String(hoje.getMonth()+1).padStart(2,'0')}-${String(hoje.getDate()).padStart(2,'0')}`;
 
   try {
-    await db.collection('focus_feitos').add({ data, descricao, valor });
+    await db.collection('face').add({ tipo: 'feito', data, descricao, valor });
 
     const valorFmt = valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
     ctx.reply(

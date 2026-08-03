@@ -1,7 +1,7 @@
 /**
  * /registrarafazerface [descrição] [valor]
  * Exemplo: /registrarafazerface alinhar direção 350
- * Adiciona ao fim da fila em focus_afazer (section Face)
+ * Adiciona ao fim da fila na coleção face (tipo:'afazer', section Face)
  */
 
 module.exports = async (ctx, db) => {
@@ -24,11 +24,11 @@ module.exports = async (ctx, db) => {
   const descricao = partes.join(' ') || 'sem descrição';
 
   try {
-    const snap = await db.collection('focus_afazer').orderBy('prioridade', 'desc').limit(1).get();
-    const maxPrio    = snap.empty ? 0 : (snap.docs[0].data().prioridade || 0);
+    const snap = await db.collection('face').where('tipo', '==', 'afazer').get();
+    const maxPrio    = snap.docs.reduce((max, d) => Math.max(max, d.data().prioridade || 0), 0);
     const prioridade = maxPrio + 1;
 
-    await db.collection('focus_afazer').add({ prioridade, descricao, valor });
+    await db.collection('face').add({ tipo: 'afazer', prioridade, descricao, valor });
 
     const valorFmt = valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
     ctx.reply(

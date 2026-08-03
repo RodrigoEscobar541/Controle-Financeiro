@@ -2,47 +2,60 @@
 
 ---
 
-## Section: Carro
+## Section: Focus
+
+> Chamada de "Carro" (e arquivo `carro.js`) quando foi criada originalmente.
+> Depois de uma consolidação de banco de dados, o nome interno virou `focus`
+> (igual ao rótulo já exibido no menu) e as 3 listas passaram a viver na
+> mesma coleção — ver `Arquitetura_BD_Firestore.md` para o schema atual e a
+> convenção de "1 coleção por section" que motivou a mudança.
 
 ### Visão Geral
 
 Section de anotações do carro, dividida em 3 listas independentes. Não é uma planilha financeira — é um bloco de notas estruturado para rastrear manutenções pendentes, realizadas e preventivas.
 
-**Rota:** `#carro`
-**Arquivo JS:** `public/js/carro.js`
-**Section HTML:** `<section id="section-carro" class="content-section">`
+**Rota:** `#focus`
+**Arquivo JS:** `public/js/focus.js`
+**Section HTML:** `<section id="section-focus" class="content-section">`
 
 ---
 
 ### Banco de Dados Firestore
 
-#### Coleção: `carro_afazer`
-Manutenções necessárias, ordenadas por prioridade (campo numérico `prioridade`).
+Coleção única `focus`, um documento por registro, diferenciado pelo campo `tipo`
+(ver `Arquitetura_BD_Firestore.md` para o schema completo e atualizado):
+
+#### `tipo: "afazer"`
+Manutenções necessárias, ordenadas por prioridade (campo numérico `prioridade`,
+atribuída automaticamente como fim da fila — não é pedida ao usuário).
 
 ```
 {id_aleatorio}: {
+  tipo:        "afazer",
   prioridade:  1,              // inteiro — define a ordem da lista (1 = mais urgente)
   descricao:   "Trocar pneu traseiro esquerdo",
   valor:        450.00         // preço estimado
 }
 ```
 
-#### Coleção: `carro_feitos`
+#### `tipo: "feito"`
 Manutenções já realizadas, ordenadas por data (mais recente primeiro).
 
 ```
 {id_aleatorio}: {
+  tipo:        "feito",
   data:        "2026-06-10",   // YYYY-MM-DD
   descricao:   "Troca de óleo",
   valor:        180.00
 }
 ```
 
-#### Coleção: `carro_manutencao`
+#### `tipo: "manutencao"`
 Itens de manutenção preventiva periódica.
 
 ```
 {id_aleatorio}: {
+  tipo:          "manutencao",
   descricao:     "Troca de óleo",
   data:          "2026-05-01",   // YYYY-MM-DD — data da última troca
   kmUltimaTroca: "52.400 km",   // string livre
@@ -81,24 +94,24 @@ A section é dividida em 3 blocos verticais (ou abas), cada um com sua própria 
 
 | Arquivo | Alteração |
 |---------|-----------|
-| `public/js/carro.js` | Criar — lógica da section (subscribe, render, forms) |
-| `public/app.html` | Adicionar `<a data-section="carro">` no nav + `<section id="section-carro">` |
-| `public/js/app.js` | Adicionar `import { initCarro }` e chamada no switch de sections |
-| `Querys/carro-queries.js` | Criar — queries para o bot Telegram (opcional, fase 2) |
+| `public/js/focus.js` | Criar — lógica da section (subscribe, render, forms) |
+| `public/app.html` | Adicionar `<a data-section="focus">` no nav + `<section id="section-focus">` |
+| `public/js/app.js` | Adicionar `import { initFocus }` e chamada no switch de sections |
+| `Querys/focus-queries.js` | Criar — queries para o bot Telegram (opcional, fase 2) |
 
 ---
 
-## Bloco: Abastecimento (dentro das sections Carro/Focus e Face)
+## Bloco: Abastecimento (dentro das sections Focus e Face)
 
 ### Visão Geral
 
-4º bloco dentro das sections de carro (`section-carro`/`carro.js` e `section-face`/
-`focus.js`), para registrar cada enchida de tanque e calcular km/L e R$/km de cada
+4º bloco dentro das sections de carro (`section-focus`/`focus.js` e `section-face`/
+`face.js`), para registrar cada enchida de tanque e calcular km/L e R$/km de cada
 carro. Segue o mesmo padrão dos outros blocos (onSnapshot + render + modal).
 
-**Coleções por carro:** `carro_abastecimento` (section Carro, rotulada "Focus" na UI)
-e `focus_abastecimento` (section Face, rotulada "Face" na UI) — prefixo segue o
-arquivo/coleção, não o rótulo visível (mesma convenção já usada em afazer/feitos/manutenção).
+**Coleções por carro:** `focus` (section Focus) e `face` (section Face) — mesma
+coleção única usada pelos outros 3 blocos da section, diferenciada pelo campo
+`tipo: "abastecimento"`.
 
 **Coleção compartilhada:** `combustivel_tipos` — lista gerenciável de tipos de
 combustível (CRUD), usada pelas duas sections. Seedada com 3 defaults (Gasolina,
@@ -108,10 +121,11 @@ Etanol, Diesel) na primeira vez que estiver vazia.
 
 ### Banco de Dados Firestore
 
-#### Coleções: `carro_abastecimento` / `focus_abastecimento`
+#### `tipo: "abastecimento"` (nas coleções `focus` / `face`)
 
 ```
 {id_aleatorio}: {
+  tipo:            "abastecimento",
   data:            "2026-07-02",  // YYYY-MM-DD, auto = hoje ao criar, editável
   km:               350,           // km rodado NESTE tanque (não é odômetro acumulado)
   correcao:         10,            // % a descontar do km informado (0 = sem correção)
@@ -144,7 +158,7 @@ Card "⛽ Abastecimento", com botão "⚙️ Tipos" (abre modal de gerenciar tip
   revela um campo de texto — ao salvar, cria o tipo em `combustivel_tipos` antes de
   gravar o abastecimento.
 - "Valor pago por litro" é opcional; o último valor digitado fica em `localStorage`
-  (`tf_valorPago_carro` / `tf_valorPago_focus`) só para pré-preencher o campo na
+  (`tf_valorPago_focus` / `tf_valorPago_face`) só para pré-preencher o campo na
   próxima abertura do formulário — o valor em si sempre é salvo no Firestore.
 
 ---
@@ -154,10 +168,10 @@ Card "⛽ Abastecimento", com botão "⚙️ Tipos" (abre modal de gerenciar tip
 | Arquivo | Alteração |
 |---------|-----------|
 | `public/js/combustivel-tipos.js` | Criado — CRUD e modal de gerenciamento de `combustivel_tipos`, compartilhado entre as duas sections |
-| `public/js/carro.js` | Bloco Abastecimento para `carro_abastecimento` |
-| `public/js/focus.js` | Bloco Abastecimento para `focus_abastecimento` |
+| `public/js/focus.js` | Bloco Abastecimento (`tipo:"abastecimento"` na coleção `focus`) |
+| `public/js/face.js` | Bloco Abastecimento (`tipo:"abastecimento"` na coleção `face`) |
 | `public/app.html` | Card "⛽ Abastecimento" nas duas sections, entre Feitos e Manutenção Preventiva |
-| `Querys/carro-queries.js` / `Querys/focus-queries.js` | CRUD de abastecimento para uso futuro do bot Telegram |
+| `Querys/focus-queries.js` / `Querys/face-queries.js` | CRUD de abastecimento para uso futuro do bot Telegram |
 | `Querys/combustivel-tipos-queries.js` | Criado — CRUD de tipos de combustível para uso futuro do bot Telegram |
 
 ---
@@ -294,16 +308,17 @@ Uma section criada pelo usuário (ou pelo agente) a partir de um template.
 ```
 
 Mapeamento de `colecoes` por template (a partir do `slug`):
-- `banco` / `patrimonio` / `devo-devem` → `{ principal: slug }`
+- `banco` / `patrimonio` / `devo-devem` / `carro` → `{ principal: slug }`
+  (no template `carro`, os registros dentro de `principal` são diferenciados
+  pelo campo `tipo`, igual às coleções `focus`/`face` — compartilha a coleção
+  global `combustivel_tipos` com Focus/Face)
 - `distribuicao` → `{ mensal: "{slug}_mensal", colunasConfig: "{slug}_colunas" }`
-- `carro` → `{ afazer, feitos, manutencao, abastecimento }: "{slug}_afazer"` etc.
-  (compartilha a coleção global `combustivel_tipos` com Focus/Face)
 
 #### Documento: `config/secoes_ocultas`
 Sections **fixas** ocultadas pelo usuário (nunca inclui `"dashboard"`).
 
 ```
-{ nomes: ["carro", "banco"] }
+{ nomes: ["focus", "banco"] }
 ```
 
 ---

@@ -29,7 +29,7 @@ export const SECOES_FIXAS = [
   { key: 'distribuicao', label: 'Distribuição', icon: '📅' },
   { key: 'patrimonio',   label: 'Patrimônio',   icon: '💎' },
   { key: 'contas-casa',  label: 'Contas Casa',  icon: '🏠' },
-  { key: 'carro',        label: 'Focus',        icon: '🚗' },
+  { key: 'focus',        label: 'Focus',        icon: '🚗' },
   { key: 'face',         label: 'Face',         icon: '🚙' },
   { key: 'devo-devem',   label: 'Devo / Devem', icon: '💸' }
 ];
@@ -62,12 +62,7 @@ export const TEMPLATES = {
     label: 'Novo Carro',
     icon: '🚗',
     desc: 'A Fazer, Feitos, Abastecimento e Manutenção Preventiva — igual a Focus/Face.',
-    buildColecoes: slug => ({
-      afazer:        `${slug}_afazer`,
-      feitos:         `${slug}_feitos`,
-      manutencao:     `${slug}_manutencao`,
-      abastecimento:  `${slug}_abastecimento`
-    })
+    buildColecoes: slug => ({ principal: slug })
   },
   'devo-devem': {
     label: 'Devo / Devem',
