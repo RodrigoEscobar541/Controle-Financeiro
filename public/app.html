@@ -336,6 +336,33 @@
     <section id="section-patrimonio" class="content-section">
       <div class="card">
         <div class="card-header">
+          <h3 class="card-title">Reservas</h3>
+          <button id="btn-add-reserva" class="btn btn-primary">+ Nova Reserva</button>
+        </div>
+        <table class="data-table" id="reservas-table">
+          <thead>
+            <tr>
+              <th>Reserva</th>
+              <th>Onde está</th>
+              <th class="text-right">Valor (R$)</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="reservas-tbody">
+            <tr><td colspan="4" class="loading">Carregando...</td></tr>
+          </tbody>
+          <tfoot>
+            <tr>
+              <td colspan="2"><strong>Total</strong></td>
+              <td class="text-right"><strong id="reservas-total">R$ 0,00</strong></td>
+              <td></td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
           <h3 class="card-title">Patrimônio e Investimentos</h3>
           <button id="btn-add-ativo" class="btn btn-primary">+ Novo Ativo</button>
         </div>

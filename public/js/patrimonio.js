@@ -10,6 +10,13 @@
  *   Coleção: patrimonioDivisoes  (divisões do gráfico pizza)
  *   Documento (ID aleatório):
  *     { nome: "Criptomoeda", cor: "#1565C0" }
+ *
+ *   Coleção: reservas  (tabela própria, no topo da seção)
+ *   Documento (ID aleatório):
+ *     { nome: "Emergência", ondeEsta: "Nubank CDB", valor: 15000 }
+ *   ATENÇÃO: reservas NÃO entram na soma do patrimônio (nem no total da
+ *   tabela de ativos, nem no gráfico, nem nos agregados do dashboard/bot).
+ *   Coleção separada justamente para manter esse isolamento.
  */
 
 import { db } from './firebase-config.js';
@@ -20,8 +27,10 @@ import {
 
 let ativos       = [];
 let divisoes     = [];
+let reservas     = [];
 let unsubAtivos   = null;
 let unsubDivisoes = null;
+let unsubReservas = null;
 
 // Paleta harmônica — cores atribuídas às divisões na ordem de cadastro.
 const PALETA = [
@@ -33,8 +42,10 @@ const COR_SEM_CLASSE = '#94A3B8';
 export function initPatrimonio() {
   document.getElementById('btn-add-ativo').addEventListener('click', abrirModalNovoAtivo);
   document.getElementById('btn-add-divisao').addEventListener('click', abrirModalNovaDivisao);
+  document.getElementById('btn-add-reserva').addEventListener('click', abrirModalNovaReserva);
   subscribeDivisoes();
   subscribeAtivos();
+  subscribeReservas();
 }
 
 function subscribeAtivos() {
@@ -55,6 +66,141 @@ function subscribeDivisoes() {
     renderTabela();
     renderPizza();
   }, () => showToast('Erro ao carregar divisões.', 'error'));
+}
+
+function subscribeReservas() {
+  if (unsubReservas) unsubReservas();
+  unsubReservas = onSnapshot(collection(db, 'reservas'), snap => {
+    reservas = snap.docs.map(d => ({ id: d.id, ...d.data() }))
+                        .sort((a, b) => (a.nome || '').localeCompare(b.nome || '', 'pt-BR'));
+    renderTabelaReservas();
+  }, () => showToast('Erro ao carregar reservas.', 'error'));
+}
+
+// ──────────────────────────────────────────────
+// TABELA DE RESERVAS
+// Isolada do patrimônio: o total abaixo é só desta tabela e não é somado
+// em nenhum outro lugar.
+// ──────────────────────────────────────────────
+function renderTabelaReservas() {
+  const tbody   = document.getElementById('reservas-tbody');
+  const totalEl = document.getElementById('reservas-total');
+
+  if (reservas.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="4" class="empty-state">
+      Nenhuma reserva cadastrada. Clique em "+ Nova Reserva".
+    </td></tr>`;
+    totalEl.textContent = 'R$ 0,00';
+    return;
+  }
+
+  let total = 0;
+  tbody.innerHTML = reservas.map(r => {
+    total += parseFloat(r.valor) || 0;
+    return `<tr>
+      <td><strong>${esc(r.nome)}</strong></td>
+      <td>${esc(r.ondeEsta)}</td>
+      <td class="text-right">${fmtBRL(r.valor)}</td>
+      <td style="text-align:center;white-space:nowrap">
+        <button class="btn-icon" data-res-action="edit" data-id="${r.id}" title="Editar">✏️</button>
+        <button class="btn-icon" data-res-action="delete" data-id="${r.id}" title="Excluir">🗑️</button>
+      </td>
+    </tr>`;
+  }).join('');
+
+  totalEl.textContent = fmtBRL(total);
+
+  tbody.querySelectorAll('[data-res-action="edit"]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const reserva = reservas.find(r => r.id === btn.dataset.id);
+      if (reserva) abrirModalEditarReserva(reserva);
+    });
+  });
+
+  tbody.querySelectorAll('[data-res-action="delete"]').forEach(btn => {
+    btn.addEventListener('click', () => confirmarExclusaoReserva(btn.dataset.id));
+  });
+}
+
+function reservaFormHtml(reserva = {}) {
+  return `
+    <div class="form-group">
+      <label>Nome da reserva</label>
+      <input type="text" id="reserva-nome" value="${escAttr(reserva.nome || '')}" placeholder="Ex: Emergência, Viagem">
+    </div>
+    <div class="form-group">
+      <label>Onde está</label>
+      <input type="text" id="reserva-onde" value="${escAttr(reserva.ondeEsta || '')}" placeholder="Ex: Nubank CDB, Mercado Pago">
+    </div>
+    <div class="form-group">
+      <label>Valor (R$)</label>
+      <input type="number" id="reserva-valor" value="${reserva.valor ?? ''}" step="0.01" min="0" placeholder="0,00">
+    </div>`;
+}
+
+function lerFormReserva() {
+  const nome     = document.getElementById('reserva-nome').value.trim();
+  const ondeEsta = document.getElementById('reserva-onde').value.trim();
+  const valor    = parseFloat(document.getElementById('reserva-valor').value);
+
+  if (!nome || !ondeEsta || isNaN(valor) || valor < 0) {
+    showToast('Preencha todos os campos.', 'error');
+    return null;
+  }
+  return { nome, ondeEsta, valor };
+}
+
+function abrirModalNovaReserva() {
+  openModal(
+    'Nova Reserva',
+    reservaFormHtml(),
+    async () => {
+      const dados = lerFormReserva();
+      if (!dados) return;
+      try {
+        await addDoc(collection(db, 'reservas'), dados);
+        showToast('Reserva adicionada!', 'success');
+      } catch {
+        showToast('Erro ao adicionar reserva.', 'error');
+      }
+    },
+    'Adicionar'
+  );
+}
+
+function abrirModalEditarReserva(reserva) {
+  openModal(
+    `Editar — ${reserva.nome}`,
+    reservaFormHtml(reserva),
+    async () => {
+      const dados = lerFormReserva();
+      if (!dados) return;
+      try {
+        await updateDoc(doc(db, 'reservas', reserva.id), dados);
+        showToast('Reserva atualizada!', 'success');
+      } catch {
+        showToast('Erro ao atualizar.', 'error');
+      }
+    },
+    'Salvar'
+  );
+}
+
+function confirmarExclusaoReserva(id) {
+  const reserva = reservas.find(r => r.id === id);
+  openModal(
+    'Excluir reserva',
+    `<p>Deseja excluir <strong>${esc(reserva?.nome || 'esta reserva')}</strong>? Esta ação não pode ser desfeita.</p>`,
+    async () => {
+      try {
+        await deleteDoc(doc(db, 'reservas', id));
+        showToast('Reserva excluída.', 'success');
+      } catch {
+        showToast('Erro ao excluir.', 'error');
+      }
+    },
+    'Excluir'
+  );
 }
 
 // ──────────────────────────────────────────────
