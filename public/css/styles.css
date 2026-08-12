@@ -1555,6 +1555,10 @@ th[draggable]:active { cursor: grabbing; }
   color: var(--text);
 }
 .select-tipo-inv:focus { border-color: var(--primary); outline: none; }
+/* O select ganha a cor da divisão por style inline (ver patrimonio.js). No
+   Chrome/Windows a lista aberta herda esse fundo e todas as opções sairiam da
+   mesma cor — aqui elas voltam ao neutro. */
+.select-tipo-inv option { background: var(--card); color: var(--text); }
 
 @media (max-width: 640px) {
   .pizza-wrap { gap: 1rem; justify-content: center; }

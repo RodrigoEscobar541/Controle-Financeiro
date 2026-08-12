@@ -51,8 +51,9 @@ export function initPatrimonio() {
 function subscribeAtivos() {
   if (unsubAtivos) unsubAtivos();
   unsubAtivos = onSnapshot(collection(db, 'patrimonio'), snap => {
-    ativos = snap.docs.map(d => ({ id: d.id, ...d.data() }))
-                      .sort((a, b) => (a.nomeDoAtivo || '').localeCompare(b.nomeDoAtivo || '', 'pt-BR'));
+    // A ordenação mora em renderTabela(): depende das divisões, que chegam
+    // em outro snapshot e podem carregar depois destes ativos.
+    ativos = snap.docs.map(d => ({ id: d.id, ...d.data() }));
     renderTabela();
     renderPizza();
   }, () => showToast('Erro ao carregar patrimônio.', 'error'));
@@ -219,7 +220,7 @@ function renderTabela() {
   }
 
   let total = 0;
-  tbody.innerHTML = ativos.map(a => {
+  tbody.innerHTML = ordenarPorTipo(ativos).map(a => {
     total += parseFloat(a.valor) || 0;
     return `<tr>
       <td><strong>${esc(a.nomeDoAtivo)}</strong></td>
@@ -257,8 +258,30 @@ function renderTabela() {
   });
 }
 
+/**
+ * Agrupa os ativos por tipo de investimento, na mesma ordem em que as divisões
+ * aparecem na legenda do gráfico — assim tabela e pizza se leem juntas.
+ * Ativos sem divisão correspondente caem no fim. Dentro de cada grupo, alfabético.
+ */
+function ordenarPorTipo(lista) {
+  const ordem = new Map(divisoes.map((d, i) => [d.nome, i]));
+  const posicao = a => ordem.has(a.tipoInvestimento) ? ordem.get(a.tipoInvestimento) : divisoes.length;
+  return [...lista].sort((a, b) => {
+    const pa = posicao(a), pb = posicao(b);
+    if (pa !== pb) return pa - pb;
+    // Sem divisão: agrupa pelo texto do tipo antes de cair no nome do ativo.
+    const ta = (a.tipoInvestimento || '').localeCompare(b.tipoInvestimento || '', 'pt-BR');
+    if (ta !== 0) return ta;
+    return (a.nomeDoAtivo || '').localeCompare(b.nomeDoAtivo || '', 'pt-BR');
+  });
+}
+
+function corDoTipo(tipo) {
+  return divisoes.find(d => d.nome === tipo)?.cor || null;
+}
+
 function selectTipoInvestimento(ativo) {
-  const atual = ativo.tipoInvestimento || '';
+  const atual  = ativo.tipoInvestimento || '';
   const existe = divisoes.some(d => d.nome === atual);
   const opcoes = [`<option value="">— selecionar —</option>`];
   divisoes.forEach(d => {
@@ -268,7 +291,15 @@ function selectTipoInvestimento(ativo) {
   if (atual && !existe) {
     opcoes.push(`<option value="${escAttr(atual)}" selected>${esc(atual)} (sem divisão)</option>`);
   }
-  return `<select class="select-tipo-inv" data-id="${ativo.id}">${opcoes.join('')}</select>`;
+
+  // Pinta o select com a cor da divisão (a mesma do gráfico). Sem divisão
+  // correspondente fica cinza; sem tipo nenhum, mantém o estilo padrão.
+  const cor = corDoTipo(atual) || (atual ? COR_SEM_CLASSE : null);
+  const estilo = cor
+    ? ` style="background:${cor};border-color:${cor};color:${corDeTextoSobre(cor)}"`
+    : '';
+
+  return `<select class="select-tipo-inv" data-id="${ativo.id}"${estilo}>${opcoes.join('')}</select>`;
 }
 
 function formHtml(ativo = {}) {
@@ -546,6 +577,25 @@ function esc(v) {
 }
 function escAttr(v) {
   return String(v ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+}
+/**
+ * Preto ou branco sobre a cor de fundo, o que tiver mais contraste.
+ * As cores das divisões são escolhidas à mão no color picker, então podem ser
+ * tanto escuras quanto claras — texto fixo ficaria ilegível em metade delas.
+ * Luminância relativa da WCAG; corte em 0.5 (≈ 4.5:1 nos dois sentidos).
+ */
+function corDeTextoSobre(hex) {
+  const m = /^#?([\da-f]{6})$/i.exec(String(hex || ''));
+  if (!m) return '#FFFFFF';
+  const n = parseInt(m[1], 16);
+  const canal = c => {
+    const v = c / 255;
+    return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4);
+  };
+  const lum = 0.2126 * canal((n >> 16) & 255)
+            + 0.7152 * canal((n >> 8) & 255)
+            + 0.0722 * canal(n & 255);
+  return lum > 0.5 ? '#1A1A2E' : '#FFFFFF';
 }
 function hslToHex(h, s, l) {
   s /= 100; l /= 100;
