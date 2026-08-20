@@ -68,6 +68,26 @@ export const SECOES_BELLA = [
   }
 ];
 
+/**
+ * Ordem do menu na visão da Bella.
+ *
+ * A ordem padrão viria da ordem do HTML (sections fixas) seguida das
+ * sections dela, o que deixaria Contas Casa e Face no meio. Aqui as dela
+ * vêm primeiro, e as duas compartilhadas fecham a lista.
+ *
+ * Chaves que não estiverem aqui continuam funcionando — só ficam antes das
+ * listadas. Na prática são as sections que ela não vê, então não aparecem.
+ */
+export const ORDEM_SIDEBAR_BELLA = [
+  'dashboard',
+  'distribuicao-bella',
+  'banco-bella',
+  'devo-devem-bella',
+  'patrimonio-bella',
+  'contas-casa',
+  'face'
+];
+
 /** Chaves de permissão de todas as sections da Bella. */
 export const CHAVES_BELLA = SECOES_BELLA.map(s => s.chave);
 

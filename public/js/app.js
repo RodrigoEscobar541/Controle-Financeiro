@@ -17,7 +17,7 @@ import {
 import {
   carregarPermissoes, ehAdmin, podeVer, nomeUsuario, semAcessoNenhum
 } from './permissoes.js';
-import { SECOES_BELLA, GRUPO_BELLA } from './secoes-bella.js';
+import { SECOES_BELLA, GRUPO_BELLA, ORDEM_SIDEBAR_BELLA } from './secoes-bella.js';
 
 // ──────────────────────────────────────────────
 // UTILIDADES GLOBAIS
@@ -330,6 +330,28 @@ function montarGrupoBella() {
   if (ehAdmin()) adicionarCabecalhoGrupo(GRUPO_BELLA);
   visiveis.forEach(registrarSecaoExtraNoDOM);
   limparGruposVazios();
+
+  // Só na visão dela. No menu do admin a ordem das sections fixas é a do
+  // HTML e o grupo BELLA fica no fim, atrás do cabeçalho — reordenar ali
+  // misturaria os dois grupos e o cabeçalho passaria a rotular a lista
+  // errada.
+  if (!ehAdmin()) ordenarSidebar(ORDEM_SIDEBAR_BELLA);
+}
+
+/**
+ * Reordena os itens do menu segundo uma lista de chaves.
+ * Reanexar um <li> move ele para o fim, então percorrer a ordem desejada
+ * deixa a lista exatamente nessa sequência. Itens fora da lista sobram no
+ * começo — e como são justamente os que a pessoa não pode ver (já estão
+ * com display:none), não aparecem.
+ */
+function ordenarSidebar(ordem) {
+  const lista = document.querySelector('.nav-list');
+  if (!lista) return;
+  ordem.forEach(chave => {
+    const li = lista.querySelector(`.nav-link[data-section="${chave}"]`)?.closest('li');
+    if (li) lista.appendChild(li);
+  });
 }
 
 function registrarSecaoExtraNoDOM(secao) {
