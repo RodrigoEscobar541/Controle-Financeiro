@@ -32,7 +32,10 @@ export const SECOES_BELLA = [
     titulo:   'Banco — Mercado Pago',
     icone:    '💳',
     template: 'banco',
-    colecoes: { principal: 'banco_bella' }
+    colecoes: { principal: 'banco_bella' },
+    // O card de saldo vem acompanhado das duas listas de últimos lançamentos,
+    // como no dashboard do admin.
+    dashboard: { listas: true }
   },
   {
     chave:    'distribuicao-bella',
@@ -92,7 +95,10 @@ export const SECOES_COMPARTILHADAS = [
     nome:     'Face',
     icone:    '🚙',
     template: 'carro',
-    colecoes: { principal: 'face' }
+    colecoes: { principal: 'face' },
+    // Consumo médio em vez de total gasto — é o que o dashboard do admin
+    // mostra para este carro.
+    dashboard: { tipo: 'consumo' }
   }
 ];
 

@@ -1,7 +1,7 @@
 import { db } from './firebase-config.js';
 import { fmtBRL, fmtDate, mesAtualId, idToLabel, mesAtualLabel } from './app.js';
 import { carregarSecoesCustomizadas } from './section-templates.js';
-import { metricaSecao } from './custom-sections.js';
+import { metricaSecao, metricaConsumo } from './custom-sections.js';
 import { podeVer, ehAdmin } from './permissoes.js';
 import {
   collection, query, orderBy, where, limit, getDocs, doc, getDoc, onSnapshot
@@ -279,33 +279,16 @@ async function carregarTotalInvestimentos() {
 // Consumo médio (km/L e R$/km) dos últimos 100 abastecimentos de um carro
 // (a coleção é compartilhada entre os 4 tipos de registro — filtra por tipo e
 // ordena/limita em memória para não precisar de índice composto no Firestore)
+// A fórmula do consumo vive em custom-sections.js (metricaConsumo), para o
+// dashboard da Bella usar exatamente o mesmo cálculo — duas cópias da conta
+// de km/L divergiriam na primeira correção.
 async function carregarConsumoCarro(colecao, idKmL, idRsKm) {
   const elKmL  = document.getElementById(idKmL);
   const elRsKm = document.getElementById(idRsKm);
   try {
-    const q    = query(collection(db, colecao), where('tipo', '==', 'abastecimento'));
-    const snap = await getDocs(q);
-    const itensRecentes = snap.docs
-      .map(d => d.data())
-      .sort((a, b) => String(b.data || '').localeCompare(String(a.data || '')))
-      .slice(0, 100);
-
-    const kmLValores  = [];
-    const rsKmValores = [];
-    itensRecentes.forEach(item => {
-      const correcao  = parseFloat(item.correcao) || 0;
-      const kmEfetivo = (parseFloat(item.km) || 0) * (1 - correcao / 100);
-      const litros    = parseFloat(item.litros) || 0;
-      if (litros > 0 && kmEfetivo > 0)          kmLValores.push(kmEfetivo / litros);
-      if (item.valorPago && kmEfetivo > 0)      rsKmValores.push((parseFloat(item.valorPago) * litros) / kmEfetivo);
-    });
-
-    elKmL.textContent  = kmLValores.length
-      ? `${(kmLValores.reduce((s, v) => s + v, 0) / kmLValores.length).toFixed(2)} km/L`
-      : '—';
-    elRsKm.textContent = rsKmValores.length
-      ? `${fmtBRL(rsKmValores.reduce((s, v) => s + v, 0) / rsKmValores.length)}/km`
-      : '—';
+    const { kmL, rsKm } = await metricaConsumo(colecao);
+    elKmL.textContent  = kmL;
+    elRsKm.textContent = rsKm;
   } catch {
     elKmL.textContent  = '—';
     elRsKm.textContent = '—';

@@ -20,7 +20,7 @@ import { podeVer } from './permissoes.js';
 import { subscribeTiposCombustivel, adicionarTipoCombustivel, abrirModalGerenciarTipos } from './combustivel-tipos.js';
 import {
   collection, query, orderBy, where, onSnapshot,
-  addDoc, updateDoc, deleteDoc, doc, getDoc, getDocs, setDoc, deleteField, writeBatch
+  addDoc, updateDoc, deleteDoc, doc, getDoc, getDocs, setDoc, deleteField, writeBatch, limit
 } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
 
 // ──────────────────────────────────────────────
@@ -64,19 +64,62 @@ function montarDashboardGrupo(container, secao) {
     return;
   }
 
-  container.innerHTML = `
-    <div class="dashboard-grid" data-role="grid">
-      ${membros.map(m => `
-        <div class="card stat-card" data-card="${m.chave}" style="cursor:pointer" title="Abrir ${esc(m.nome)}">
-          <div class="stat-icon">${m.icone || '📁'}</div>
-          <div class="stat-info">
-            <div class="stat-value" data-role="valor-${m.chave}">…</div>
-            <div class="stat-label" data-role="label-${m.chave}">${esc(m.nome)}</div>
-            <div class="stat-sub" data-role="sub-${m.chave}">Carregando…</div>
-          </div>
-        </div>`).join('')}
-    </div>
-  `;
+  const abrivel = m => `data-card="${m.chave}" style="cursor:pointer" title="Abrir ${esc(m.nome)}"`;
+
+  const cardMetrica = m => `
+    <div class="card stat-card" ${abrivel(m)}>
+      <div class="stat-icon">${m.icone || '📁'}</div>
+      <div class="stat-info">
+        <div class="stat-value" data-role="valor-${m.chave}">…</div>
+        <div class="stat-label" data-role="label-${m.chave}">${esc(m.nome)}</div>
+        <div class="stat-sub" data-role="sub-${m.chave}">Carregando…</div>
+      </div>
+    </div>`;
+
+  // Carro: consumo médio em vez do total gasto. É o que o dashboard principal
+  // mostra para Focus e Face, e o número que se olha no dia a dia.
+  const cardConsumo = m => `
+    <div class="card stat-card orcamento-duplo" ${abrivel(m)}>
+      <div class="orcamento-item">
+        <div class="stat-icon">⛽</div>
+        <div class="stat-info">
+          <div class="stat-value" data-role="kml-${m.chave}">—</div>
+          <div class="stat-label">Consumo ${esc(m.nome)}</div>
+          <div class="stat-sub">Média últimos 100 abastecimentos</div>
+        </div>
+      </div>
+      <div class="stat-divider"></div>
+      <div class="orcamento-item">
+        <div class="stat-icon">💰</div>
+        <div class="stat-info">
+          <div class="stat-value" data-role="rskm-${m.chave}">—</div>
+          <div class="stat-label">Custo por km ${esc(m.nome)}</div>
+          <div class="stat-sub">Média últimos 100 abastecimentos</div>
+        </div>
+      </div>
+    </div>`;
+
+  const cardLista = (m, titulo, papel) => `
+    <div class="card" ${abrivel(m)}>
+      <div class="card-header"><h3 class="card-title">${titulo}</h3></div>
+      <table class="data-table">
+        <thead><tr><th>Data</th><th>Descrição</th><th class="text-right">Valor</th></tr></thead>
+        <tbody data-role="${papel}-${m.chave}"><tr><td colspan="3" class="loading">Carregando...</td></tr></tbody>
+      </table>
+    </div>`;
+
+  const htmlDe = m => {
+    if (m.dashboard?.tipo === 'consumo') return cardConsumo(m);
+    // Banco: além do card de saldo, as duas listas de últimos lançamentos.
+    if (m.dashboard?.listas) {
+      return cardMetrica(m)
+           + cardLista(m, 'Últimas 5 Saídas',   'saidas')
+           + cardLista(m, 'Últimas 5 Entradas', 'entradas');
+    }
+    return cardMetrica(m);
+  };
+
+  container.innerHTML = `<div class="dashboard-grid" data-role="grid">${membros.map(htmlDe).join('')}</div>`;
 
   container.querySelectorAll('[data-card]').forEach(card => {
     card.addEventListener('click', () => {
@@ -84,8 +127,21 @@ function montarDashboardGrupo(container, secao) {
     });
   });
 
+  const q = papel => container.querySelector(`[data-role="${papel}"]`);
+
   membros.forEach(async m => {
-    const q = role => container.querySelector(`[data-role="${role}"]`);
+    if (m.dashboard?.tipo === 'consumo') {
+      try {
+        const { kmL, rsKm } = await metricaConsumo(m.colecoes.principal);
+        q(`kml-${m.chave}`).textContent  = kmL;
+        q(`rskm-${m.chave}`).textContent = rsKm;
+      } catch {
+        q(`kml-${m.chave}`).textContent  = '—';
+        q(`rskm-${m.chave}`).textContent = '—';
+      }
+      return;
+    }
+
     try {
       const metrica = await metricaSecao(m);
       q(`valor-${m.chave}`).textContent = metrica?.principal?.valor ?? '—';
@@ -101,10 +157,77 @@ function montarDashboardGrupo(container, secao) {
       q(`valor-${m.chave}`).textContent = '—';
       q(`sub-${m.chave}`).textContent   = `${m.nome} · indisponível`;
     }
+
+    if (m.dashboard?.listas) {
+      preencherUltimas(m.colecoes.principal, 'Saida',   q(`saidas-${m.chave}`),   'text-danger');
+      preencherUltimas(m.colecoes.principal, 'Entrada', q(`entradas-${m.chave}`), 'text-success');
+    }
   });
 
   // Sem card de anotações de propósito: o dashboard principal também não tem,
   // e um painel de visão rápida não é lugar de recado.
+}
+
+/**
+ * Últimos 5 lançamentos de um tipo ("Entrada" ou "Saida").
+ *
+ * Busca 20 e filtra depois, em vez de pedir 5 direto: `tipo` e `data` num
+ * mesmo where+orderBy exigiria índice composto, e limitar a 5 antes de
+ * filtrar deixaria a lista de Saídas vazia sempre que os últimos 5
+ * lançamentos fossem todos Entradas.
+ */
+async function preencherUltimas(colecao, tipo, tbody, classeValor) {
+  if (!tbody) return;
+  try {
+    const snap = await getDocs(query(collection(db, colecao), orderBy('data', 'desc'), limit(20)));
+    const itens = snap.docs.map(d => d.data()).filter(r => r.tipo === tipo).slice(0, 5);
+
+    if (!itens.length) {
+      tbody.innerHTML = `<tr><td colspan="3" class="empty-state">Nenhum lançamento registrado</td></tr>`;
+      return;
+    }
+    tbody.innerHTML = itens.map(i => `
+      <tr>
+        <td>${fmtDate(i.data)}</td>
+        <td>${esc(i.descricao)}</td>
+        <td class="text-right ${classeValor}">${fmtBRL(i.valor)}</td>
+      </tr>`).join('');
+  } catch {
+    tbody.innerHTML = `<tr><td colspan="3" class="loading">Erro ao carregar</td></tr>`;
+  }
+}
+
+/**
+ * Consumo médio de um carro: km/L e R$/km dos últimos 100 abastecimentos.
+ *
+ * Fonte única da fórmula — o dashboard principal também chama esta função.
+ * O `km` de cada abastecimento é o rodado NAQUELE tanque (não odômetro), e
+ * `correcao` é a % a descontar quando o painel/GPS superestima. `valorPago`
+ * é o preço POR LITRO, não o total: por isso o custo por km multiplica pelos
+ * litros antes de dividir pela distância.
+ */
+export async function metricaConsumo(colecao) {
+  const snap = await getDocs(query(collection(db, colecao), where('tipo', '==', 'abastecimento')));
+
+  const recentes = snap.docs
+    .map(d => d.data())
+    .sort((a, b) => String(b.data || '').localeCompare(String(a.data || '')))
+    .slice(0, 100);
+
+  const kmL = [], rsKm = [];
+  recentes.forEach(item => {
+    const correcao  = parseFloat(item.correcao) || 0;
+    const kmEfetivo = (parseFloat(item.km) || 0) * (1 - correcao / 100);
+    const litros    = parseFloat(item.litros) || 0;
+    if (litros > 0 && kmEfetivo > 0)     kmL.push(kmEfetivo / litros);
+    if (item.valorPago && kmEfetivo > 0) rsKm.push((parseFloat(item.valorPago) * litros) / kmEfetivo);
+  });
+
+  const media = arr => arr.reduce((s, v) => s + v, 0) / arr.length;
+  return {
+    kmL:  kmL.length  ? `${media(kmL).toFixed(2)} km/L` : '—',
+    rsKm: rsKm.length ? `${fmtBRL(media(rsKm))}/km`     : '—'
+  };
 }
 
 export async function metricaSecao(secao) {
