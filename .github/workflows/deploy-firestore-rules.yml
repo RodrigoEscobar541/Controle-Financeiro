@@ -1,0 +1,47 @@
+name: Deploy das regras do Firestore
+
+# O workflow de Hosting usa a action `action-hosting-deploy`, que publica
+# SOMENTE o conteúdo de public/. As regras de segurança precisam deste
+# workflow próprio — sem ele, firestore.rules ficaria versionado no repo mas
+# nunca chegaria a valer em produção, que é o pior dos mundos: a leitura do
+# arquivo passa a mentir sobre o que está no ar.
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'firestore.rules'
+      - 'firebase.json'
+  # Permite publicar as regras sob demanda pelo botão "Run workflow",
+  # sem precisar de um commit — útil no primeiro deploy, que deve
+  # acontecer DEPOIS de definir o admin (ver Bot Render/scripts/definir-acesso.js).
+  workflow_dispatch:
+
+jobs:
+  deploy-rules:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout do repositório
+        uses: actions/checkout@v4
+
+      - name: Configurar Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Instalar firebase-tools
+        run: npm install -g firebase-tools
+
+      - name: Gravar credencial da conta de serviço
+        run: echo '${{ secrets.FIREBASE_SERVICE_ACCOUNT }}' > "$RUNNER_TEMP/sa.json"
+
+      - name: Publicar regras
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS: ${{ runner.temp }}/sa.json
+        run: firebase deploy --only firestore:rules --project "${{ secrets.FIREBASE_PROJECT_ID }}" --non-interactive
+
+      - name: Remover credencial
+        if: always()
+        run: rm -f "$RUNNER_TEMP/sa.json"

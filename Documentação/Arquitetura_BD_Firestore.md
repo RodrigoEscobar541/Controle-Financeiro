@@ -49,6 +49,65 @@ config vs. dado.
 
 ---
 
+## Acesso: admin e convidados
+
+Desde a entrada do 2º usuário, o banco tem dono. O modelo é **admin +
+convidados**, e as regras estão versionadas em `firestore.rules` (publicadas
+pelo workflow `.github/workflows/deploy-firestore-rules.yml`).
+
+- **Admin** — custom claim `admin: true` no token de autenticação. Vê e edita
+  tudo. Não é documento e não custa leitura: viaja dentro do próprio token.
+- **Convidado** — documento `permissoes/{uid}`. Section que não estiver no
+  mapa simplesmente não existe para ele.
+
+Os dois são definidos por `Bot Render/scripts/definir-acesso.js`.
+
+### `permissoes`
+```
+{uid_do_usuario}: {
+  nome:   "Bella",
+  secoes: { "contas-casa": "leitura", "face": "escrita" },
+  atualizadoEm: "2026-08-20T12:00:00.000Z"
+}
+```
+Níveis: `"leitura"` (vê, não altera) e `"escrita"` (vê e altera). Ausência da
+chave = sem acesso nenhum.
+
+**Por que a permissão é por COLEÇÃO e não por documento:** as regras do
+Firestore não filtram documentos dentro de uma query — elas liberam ou negam
+um *caminho*. Se um único documento do resultado for negado, a query inteira
+falha (não retorna parcial). Isso só funciona aqui porque o projeto já segue
+"1 coleção por section"; é a convenção abaixo que torna o controle de acesso
+possível, e furá-la quebra o modelo inteiro.
+
+**⚠️ As regras NÃO valem para o bot.** O bot do Telegram e o Agente IA usam
+`firebase-admin` (service account), que ignora `firestore.rules` por completo.
+Qualquer restrição de convidado no bot precisa ser checada em código, dentro
+de `Bot Render/`.
+
+### Sections da Bella — sufixo `_bella`
+As sections do 2º usuário usam **coleções próprias na raiz, com sufixo
+`_bella`** (`banco_bella`, `dividas_bella`, …), ao lado das existentes.
+Nenhum dado do admin foi movido.
+
+| Section (slug de permissão) | Coleções |
+|---|---|
+| `banco-bella`         | `banco_bella` |
+| `distribuicao-bella`  | `distribuicao_mensal_bella` + `config/distribuicao_colunas_bella` |
+| `patrimonio-bella`    | `patrimonio_bella`, `reservas_bella` |
+| `devo-devem-bella`    | `dividas_bella` |
+
+O sufixo deixa a separação visível já no console do Firestore, sem precisar
+abrir o código para saber de quem é o quê.
+
+**Cada coleção nova exige um bloco explícito em `firestore.rules`.** Um
+wildcard genérico (`match /{colecao}/{doc}` casando o nome da coleção com o
+mapa de permissões) economizaria linhas, mas regras se combinam por **união**:
+um bloco largo só consegue afrouxar o que está escrito nos outros, nunca
+apertar. Explícito custa algumas linhas e não vaza por engano.
+
+---
+
 ## Coleções em uso hoje
 
 ### `banco`
@@ -79,6 +138,17 @@ bagunça do "1 coleção por tipo": é uma lista de categorias referenciada pelo
 campo `tipoInvestimento` de `patrimonio`, não um sub-tipo de ativo).
 ```
 {id_aleatorio}: { nome: "Criptomoeda", cor: "#EF6C00" }
+```
+
+### `reservas`
+Reservas da section Patrimônio (a tabela de cima, separada dos ativos
+investidos). Um documento por reserva.
+```
+{id_aleatorio}: {
+  nome:     "Reserva de emergência",
+  ondeEsta: "Nubank",
+  valor:    5000.00
+}
 ```
 
 ### `distribuicao_mensal`

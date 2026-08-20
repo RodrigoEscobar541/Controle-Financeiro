@@ -376,6 +376,71 @@ body.modal-open {
 
 .nav-icon { font-size: 1.125rem; width: 1.5rem; text-align: center; }
 
+/* ── Divisão entre grupos de sections ──────────────────────────────
+   Separa "as minhas sections" das de outra pessoa. A linha fica acima do
+   rótulo, então o cabeçalho carrega o próprio separador e não sobra traço
+   solto quando o grupo é escondido por falta de permissão. */
+.nav-group-header {
+  margin: 1.1rem 0 0.4rem;
+  padding: 0.9rem 0.875rem 0;
+  border-top: 1px solid rgba(255,255,255,0.10);
+}
+
+.nav-group-label {
+  display: block;
+  color: #6B7A90;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+/* ── Modo somente-leitura ──────────────────────────────────────────
+   Aplicado por permissoes.js na <section> quando o nível é "leitura".
+   Some com tudo que dispara escrita; o dado continua visível e legível.
+   Isto é conforto visual — a trava real está em firestore.rules. */
+.somente-leitura .btn-primary,
+.somente-leitura .btn-danger,
+.somente-leitura .btn-icon,
+.somente-leitura .card-header .btn,
+.somente-leitura .edit-col-btn,
+.somente-leitura .delete-col-btn {
+  display: none !important;
+}
+
+.somente-leitura .notas-textarea {
+  opacity: 0.7;
+  pointer-events: none;
+}
+
+/* Células que no modo normal são clicáveis (editar valor, segurar para
+   marcar Pago) perdem o affordance junto com o handler, para não convidar
+   a um clique que não vai fazer nada. */
+.somente-leitura .cell-data,
+.somente-leitura .cell-equilibrio {
+  cursor: default !important;
+}
+
+/* O cabeçalho arrastável reordena colunas — que é escrita. */
+.somente-leitura .data-table th {
+  cursor: default !important;
+}
+
+.badge-somente-leitura {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin-left: 0.6rem;
+  padding: 0.2rem 0.55rem;
+  border-radius: 999px;
+  background: rgba(95,107,124,0.14);
+  color: var(--text-secondary);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  vertical-align: middle;
+}
+
 .sidebar-actions {
   display: flex;
   flex-direction: column;

@@ -1,0 +1,210 @@
+rules_version = '2';
+
+// ══════════════════════════════════════════════════════════════════
+// Regras de segurança — Controle Financeiro
+//
+// MODELO: admin + convidados.
+//
+//   • ADMIN  → identificado por custom claim (`admin: true` no token).
+//              Vê e edita tudo. Custa ZERO leituras: o claim viaja dentro
+//              do próprio token de autenticação.
+//              Definido uma única vez por `scripts/definir-admin.js`.
+//
+//   • CONVIDADO → identificado pelo documento `permissoes/{uid}`, que lista
+//              section por section o que ele pode fazer:
+//                  { nome: "…", secoes: { "face": "escrita",
+//                                         "contas-casa": "leitura" } }
+//              Section ausente do mapa = sem acesso nenhum.
+//
+// POR QUE PERMISSÃO POR COLEÇÃO E NÃO POR DOCUMENTO:
+//   As regras do Firestore não filtram documentos dentro de uma query —
+//   elas liberam ou negam um CAMINHO. Se um único documento do resultado
+//   for negado, a query inteira falha (não retorna parcial). Por isso a
+//   unidade de permissão aqui é a coleção, o que só funciona porque o
+//   projeto já segue a convenção "1 coleção por section"
+//   (ver Documentação/Arquitetura_BD_Firestore.md).
+//
+// ⚠️  ATENÇÃO — ESTAS REGRAS NÃO VALEM PARA O BOT:
+//   O bot do Telegram e o Agente IA usam `firebase-admin` (service account),
+//   que IGNORA completamente este arquivo. Qualquer restrição de convidado
+//   no bot precisa ser checada em código, em "Bot Render/".
+// ══════════════════════════════════════════════════════════════════
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ── Identidade ────────────────────────────────────────────────
+    function autenticado() {
+      return request.auth != null;
+    }
+
+    function ehAdmin() {
+      return autenticado() && request.auth.token.admin == true;
+    }
+
+    function permPath() {
+      return /databases/$(database)/documents/permissoes/$(request.auth.uid);
+    }
+
+    function temPerm() {
+      return autenticado() && exists(permPath());
+    }
+
+    // Nível do convidado numa section: "leitura" | "escrita" | "nenhum".
+    // Chamadas get() idênticas são cacheadas dentro da mesma avaliação,
+    // então repetir esta função não cobra leituras extras.
+    function nivel(slug) {
+      return temPerm()
+        ? get(permPath()).data.get('secoes', {}).get(slug, 'nenhum')
+        : 'nenhum';
+    }
+
+    function podeLer(slug) {
+      return ehAdmin() || nivel(slug) in ['leitura', 'escrita'];
+    }
+
+    function podeEscrever(slug) {
+      return ehAdmin() || nivel(slug) == 'escrita';
+    }
+
+    // ── Quem é quem ───────────────────────────────────────────────
+    // O convidado lê o PRÓPRIO documento de permissões (a sidebar dele é
+    // montada a partir daí). Só o admin escreve — conceder acesso a si
+    // mesmo seria escalada de privilégio.
+    match /permissoes/{uid} {
+      allow read:  if ehAdmin() || (autenticado() && request.auth.uid == uid);
+      allow write: if ehAdmin();
+    }
+
+    // ── Sections da Bella (sufixo _bella na raiz) ─────────────────
+    // Coleções próprias, ao lado das existentes: nenhum dado do admin se
+    // move. O sufixo `_bella` deixa a separação visível já no console do
+    // Firestore, sem precisar abrir o código para saber de quem é o quê.
+    //
+    // As regras são escritas UMA A UMA de propósito. A alternativa —
+    // um wildcard genérico do tipo `match /{colecao}/{doc}` casando o nome
+    // da coleção com o mapa de permissões — economizaria linhas, mas as
+    // regras se combinam por UNIÃO: um wildcard largo só consegue AFROUXAR
+    // o que está escrito abaixo, nunca apertar. Explícito custa 6 blocos e
+    // não tem como vazar por engano.
+
+    match /banco_bella/{doc} {
+      allow read:  if podeLer('banco-bella');
+      allow write: if podeEscrever('banco-bella');
+    }
+
+    match /distribuicao_mensal_bella/{doc} {
+      allow read:  if podeLer('distribuicao-bella');
+      allow write: if podeEscrever('distribuicao-bella');
+    }
+
+    match /patrimonio_bella/{doc} {
+      allow read:  if podeLer('patrimonio-bella');
+      allow write: if podeEscrever('patrimonio-bella');
+    }
+
+    match /reservas_bella/{doc} {
+      allow read:  if podeLer('patrimonio-bella');
+      allow write: if podeEscrever('patrimonio-bella');
+    }
+
+    match /dividas_bella/{doc} {
+      allow read:  if podeLer('devo-devem-bella');
+      allow write: if podeEscrever('devo-devem-bella');
+    }
+
+    // ── Sections existentes (coleções na raiz) ────────────────────
+    // Ficam onde sempre estiveram: nenhum dado seu se move.
+    // O slug usado aqui é a mesma chave do `data-section` do app.html.
+
+    // Só do admin — não citadas na divisão com o convidado.
+    match /banco/{doc}              { allow read, write: if ehAdmin(); }
+    match /banco_meta/{doc}         { allow read, write: if ehAdmin(); }
+    match /patrimonio/{doc}         { allow read, write: if ehAdmin(); }
+    match /patrimonioDivisoes/{doc} { allow read, write: if ehAdmin(); }
+    match /reservas/{doc}           { allow read, write: if ehAdmin(); }
+    match /distribuicao_mensal/{doc}{ allow read, write: if ehAdmin(); }
+    match /dividas/{doc}            { allow read, write: if ehAdmin(); }
+    match /focus/{doc}              { allow read, write: if ehAdmin(); }
+
+    // Contas da Casa — convidado VISUALIZA, não altera.
+    match /contas_casa/{doc} {
+      allow read:  if podeLer('contas-casa');
+      allow write: if podeEscrever('contas-casa');
+    }
+
+    // Face — convidado visualiza E edita a section que já existe.
+    match /face/{doc} {
+      allow read:  if podeLer('face');
+      allow write: if podeEscrever('face');
+    }
+
+    // Tipos de combustível — compartilhada entre Focus e Face. Quem tem
+    // acesso à Face precisa LER (o select de abastecimento fica vazio sem
+    // isso) e ESCREVER (cadastrar um tipo novo é feito de dentro do form).
+    match /combustivel_tipos/{doc} {
+      allow read:  if podeLer('face');
+      allow write: if podeEscrever('face');
+    }
+
+    // ── Config das sections existentes ────────────────────────────
+    // Documentos avulsos numa coleção compartilhada: a permissão é por
+    // documento, ligada à section que cada um serve.
+    // Cada doc de config pertence a uma section. Sem liberar a config junto
+    // com o dado, a tela abre sem as colunas — parece bug, é permissão.
+    function secaoDaConfig(docId) {
+      return docId == 'contas_casa_colunas'        ? 'contas-casa'
+           : docId == 'distribuicao_colunas_bella' ? 'distribuicao-bella'
+           : 'nenhuma-section';
+    }
+
+    match /config/{docId} {
+      allow read:  if ehAdmin() || podeLer(secaoDaConfig(docId));
+      allow write: if ehAdmin() || podeEscrever(secaoDaConfig(docId));
+    }
+
+    // ── Anotações ─────────────────────────────────────────────────
+    // Um doc por section, com a chave da section como id — a permissão
+    // segue a da section correspondente.
+    match /notas/{secaoKey} {
+      allow read:  if podeLer(secaoKey);
+      allow write: if podeEscrever(secaoKey);
+    }
+
+    // ── Estado do bot ─────────────────────────────────────────────
+    // Heartbeat é global (um bot só para todo mundo) e o dashboard de
+    // qualquer usuário lê para mostrar o selo online/offline.
+    // Escrita: só o bot, que usa service account e nem passa por aqui.
+    match /sistema/{doc} {
+      allow read:  if autenticado();
+      allow write: if false;
+    }
+
+    // ── Administração de sections ─────────────────────────────────
+    // Criar/excluir section é privilégio de admin (os botões da sidebar
+    // ficam escondidos para o convidado, mas esconder botão não é
+    // segurança — a trava real é esta).
+    match /secoes_customizadas/{doc} { allow read, write: if ehAdmin(); }
+    match /agente_log/{doc}          { allow read, write: if ehAdmin(); }
+
+    // ── Sections customizadas antigas (coleções soltas na raiz) ───
+    // Criadas pelo botão "+ Nova Section" antes do modelo /secoes/.
+    // Continuam funcionando, restritas ao admin.
+    //
+    // NOTA sobre como as regras combinam: elas NÃO são avaliadas em ordem
+    // e uma não sobrescreve a outra — o acesso é liberado se QUALQUER
+    // bloco que casa com o caminho permitir (é união, não cascata). Por
+    // isso este catch-all é seguro: ele só ADICIONA permissão de admin e
+    // não tem como afrouxar as regras de convidado escritas acima.
+    // Pelo mesmo motivo, cuidado ao editar: um `allow` mais permissivo
+    // aqui vazaria para todas as coleções de uma vez.
+    // `{documento=**}` e não `{colecao}/{doc}`: a segunda forma só alcança
+    // documentos no primeiro nível. Se alguma coleção ganhar subcoleção um
+    // dia, com a forma curta o próprio admin ficaria sem acesso a ela — uma
+    // falha que só apareceria na hora de usar, e como "sem permissão" no
+    // console, sem pista da causa.
+    match /{documento=**} {
+      allow read, write: if ehAdmin();
+    }
+  }
+}

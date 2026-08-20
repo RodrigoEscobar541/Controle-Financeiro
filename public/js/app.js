@@ -14,6 +14,9 @@ import {
   carregarSecoesCustomizadas, criarSecaoCustomizada, excluirSecaoCustomizada,
   carregarSecoesOcultas, ocultarSecaoFixa
 } from './section-templates.js';
+import {
+  carregarPermissoes, ehAdmin, podeVer, nomeUsuario, semAcessoNenhum
+} from './permissoes.js';
 
 // ──────────────────────────────────────────────
 // UTILIDADES GLOBAIS
@@ -213,6 +216,11 @@ const SECTION_TITLES = {
 const initialized = new Set();
 
 function activateSection(name) {
+  // Trava de navegação: sem acesso, cai no dashboard em vez de abrir uma tela
+  // que só encheria o console de "insufficient permissions". Vale para link
+  // do menu, card do dashboard e chamada programática — todos passam por aqui.
+  if (!podeVer(name)) name = 'dashboard';
+
   // Nav links
   document.querySelectorAll('.nav-link').forEach(l => {
     l.classList.toggle('active', l.dataset.section === name);
@@ -282,15 +290,54 @@ async function carregarConfiguracaoSections() {
   } catch { /* sem sections customizadas cadastradas ainda */ }
 }
 
+// Uma section some do menu por DOIS motivos diferentes, que nunca devem ser
+// confundidos:
+//   • sem permissão  → decisão do admin; a pessoa não tem acesso ao dado.
+//   • oculta         → preferência de quem está usando ("não me serve").
+// Misturar os dois num campo só faz o convidado esconder algo e o admin não
+// conseguir devolver, ou uma revogação parecer defeito para quem perdeu.
+function secaoVisivel(key) {
+  return podeVer(key) && !secoesOcultas.includes(key);
+}
+
 function aplicarVisibilidadeFixas() {
   document.querySelectorAll('.nav-link[data-section]').forEach(link => {
     const key = link.dataset.section;
-    if (!key || key === 'dashboard' || key.startsWith('custom-')) return;
+    if (!key || key.startsWith('custom-')) return;
     const li = link.closest('li');
-    if (li) li.style.display = secoesOcultas.includes(key) ? 'none' : '';
+    if (li) li.style.display = (key === 'dashboard' || secaoVisivel(key)) ? '' : 'none';
   });
   document.querySelectorAll('[data-dash-section]').forEach(card => {
-    card.style.display = secoesOcultas.includes(card.dataset.dashSection) ? 'none' : '';
+    card.style.display = secaoVisivel(card.dataset.dashSection) ? '' : 'none';
+  });
+  limparGruposVazios();
+}
+
+// ── Divisão entre os grupos da sidebar ────────────────────────────
+// Cabeçalho que separa "as minhas sections" das sections de outra pessoa.
+// Só aparece quando existe pelo menos um item embaixo dele — um título
+// solto, sem nada abaixo, pareceria menu quebrado.
+export function adicionarCabecalhoGrupo(titulo) {
+  const lista = document.querySelector('.nav-list');
+  if (!lista) return null;
+  const li = document.createElement('li');
+  li.className = 'nav-group-header';
+  li.dataset.grupo = titulo;
+  li.innerHTML = `<span class="nav-group-label">${escApp(titulo)}</span>`;
+  lista.appendChild(li);
+  return li;
+}
+
+// Esconde cabeçalhos de grupo que ficaram sem nenhum item visível abaixo.
+function limparGruposVazios() {
+  document.querySelectorAll('.nav-list .nav-group-header').forEach(header => {
+    let temItem = false;
+    let irmao = header.nextElementSibling;
+    while (irmao && !irmao.classList.contains('nav-group-header')) {
+      if (irmao.style.display !== 'none') { temItem = true; break; }
+      irmao = irmao.nextElementSibling;
+    }
+    header.style.display = temItem ? '' : 'none';
   });
 }
 
@@ -455,11 +502,64 @@ if (dateEl) {
 }
 
 onAuthStateChanged(auth, async user => {
-  if (user) {
-    await carregarConfiguracaoSections();
-    activateSection('dashboard');
-  }
+  if (!user) return;
+
+  // ORDEM IMPORTA: as permissões precisam estar em memória antes de montar a
+  // sidebar e antes de qualquer query. Invertendo, o convidado enxerga o menu
+  // inteiro por um instante e as consultas disparam contra coleções que ele
+  // não pode ler.
+  await carregarPermissoes(user);
+  aplicarModoAdmin();
+
+  if (semAcessoNenhum()) { mostrarSemAcesso(user); return; }
+
+  await carregarConfiguracaoSections();
+  activateSection('dashboard');
 });
+
+// Tela em branco é o pior diagnóstico possível. Quem chega aqui ou é um
+// convidado ainda sem acesso liberado, ou é o admin cujo claim não foi
+// definido — e as duas situações têm conserto conhecido, então vale dizer
+// qual é em vez de deixar a pessoa achando que o app quebrou.
+function mostrarSemAcesso(user) {
+  document.querySelectorAll('.content-section').forEach(s => s.classList.remove('active'));
+  document.querySelector('.nav-list')?.style.setProperty('display', 'none');
+
+  const titulo = document.getElementById('page-title');
+  if (titulo) titulo.textContent = 'Sem acesso';
+
+  const main = document.querySelector('.main-content');
+  if (!main) return;
+  const aviso = document.createElement('section');
+  aviso.className = 'content-section active';
+  aviso.innerHTML = `
+    <div class="card">
+      <h3 class="card-title">Nenhuma section liberada para esta conta</h3>
+      <p style="margin-top:.75rem;color:var(--text-secondary);line-height:1.6">
+        Você entrou como <strong>${escApp(user.email || '')}</strong>, mas esta conta
+        ainda não tem acesso a nenhuma section.
+      </p>
+      <p style="margin-top:.75rem;color:var(--text-secondary);line-height:1.6">
+        Se você é o administrador e acabou de publicar esta versão, rode
+        <code>node scripts/definir-acesso.js admin &lt;seu-uid&gt;</code>
+        na pasta <code>Bot Render</code> e recarregue a página.
+      </p>
+    </div>`;
+  main.appendChild(aviso);
+}
+
+// Os botões de administrar sections são só do admin. Esconder aqui é conforto,
+// não segurança — quem chamar a função pelo console esbarra em
+// `firestore.rules`, que barra escrita em secoes_customizadas/config para
+// qualquer um que não seja admin.
+function aplicarModoAdmin() {
+  const admin = ehAdmin();
+  document.querySelector('.sidebar-actions')?.style.setProperty('display', admin ? '' : 'none');
+  document.body.classList.toggle('modo-convidado', !admin);
+
+  const emailEl = document.getElementById('user-email-sidebar');
+  if (emailEl && !admin && nomeUsuario()) emailEl.textContent = nomeUsuario();
+}
 
 // ──────────────────────────────────────────────
 // SIDEBAR MOBILE TOGGLE

@@ -2,6 +2,7 @@ import { db } from './firebase-config.js';
 import { fmtBRL, fmtDate, mesAtualId, idToLabel, mesAtualLabel } from './app.js';
 import { carregarSecoesCustomizadas } from './section-templates.js';
 import { metricaSecao } from './custom-sections.js';
+import { podeVer, ehAdmin } from './permissoes.js';
 import {
   collection, query, orderBy, where, limit, getDocs, doc, getDoc, onSnapshot
 } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
@@ -55,18 +56,28 @@ function iniciarStatusBot() {
 // Limita 5 leituras por tabela e usa os dados cacheados no dashboard
 export async function initDashboard() {
   iniciarStatusBot();
-  await Promise.all([
-    carregarUltimasSaidas(),
-    carregarUltimasEntradas(),
-    carregarOrcamentoMensal(),
-    carregarOrcamentoProximoMes(),
-    carregarContasCasaMes(),
-    carregarTotalInvestimentos(),
-    carregarDevoDeve(),
-    carregarConsumoCarro('focus', 'dash-focus-kml', 'dash-focus-rskm'),
-    carregarConsumoCarro('face', 'dash-face-kml', 'dash-face-rskm'),
-    renderCardsSecoesCustomizadas()
-  ]);
+
+  // Cada carga do dashboard bate numa coleção diferente, e cada coleção tem
+  // dono. Sem este filtro, o convidado dispara consultas a tudo que existe e
+  // o Promise.all inteiro cai no primeiro "insufficient permissions" —
+  // levando junto os cards que ele TINHA direito de ver.
+  const cargas = [];
+  const seVisivel = (slug, ...fns) => { if (podeVer(slug)) cargas.push(...fns.map(f => f())); };
+
+  seVisivel('banco',        carregarUltimasSaidas, carregarUltimasEntradas);
+  seVisivel('distribuicao', carregarOrcamentoMensal, carregarOrcamentoProximoMes);
+  seVisivel('contas-casa',  carregarContasCasaMes);
+  seVisivel('patrimonio',   carregarTotalInvestimentos);
+  seVisivel('devo-devem',   carregarDevoDeve);
+  seVisivel('focus', () => carregarConsumoCarro('focus', 'dash-focus-kml', 'dash-focus-rskm'));
+  seVisivel('face',  () => carregarConsumoCarro('face',  'dash-face-kml',  'dash-face-rskm'));
+
+  // Sections customizadas são administração — só o admin as enxerga.
+  if (ehAdmin()) cargas.push(renderCardsSecoesCustomizadas());
+
+  // allSettled e não all: um card que falhe (rede, índice, regra) não pode
+  // derrubar os outros. O dashboard é a porta de entrada; ele tem que abrir.
+  await Promise.allSettled(cargas);
 }
 
 // ──────────────────────────────────────────────

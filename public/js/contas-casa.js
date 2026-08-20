@@ -18,6 +18,7 @@
 
 import { db } from './firebase-config.js';
 import { fmtBRL, mesAtualId, idToLabel, showToast, openModal } from './app.js';
+import { podeEditar, aplicarSomenteLeitura } from './permissoes.js';
 import {
   collection, doc, setDoc, onSnapshot, deleteField, updateDoc
 } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
@@ -30,8 +31,20 @@ let unsubConf     = null;
 let filtroInicio  = '';
 let filtroFim     = '';
 
+// Esta é a única section que uma pessoa pode ter em modo "só olhar".
+// A trava real está em firestore.rules — o guarda abaixo existe para a
+// tentativa falhar com um aviso claro em vez de um erro de permissão no
+// console, e para não deixar a interface prometer o que o banco vai negar.
+function bloqueado() {
+  if (podeEditar('contas-casa')) return false;
+  showToast('Você tem acesso apenas de visualização nesta section.', '');
+  return true;
+}
+
 export function initContasCasa() {
   calcDefaultFiltro();
+
+  aplicarSomenteLeitura(document.getElementById('section-contas-casa'), 'contas-casa');
 
   const inputInicio = document.getElementById('casa-filtro-inicio');
   const inputFim    = document.getElementById('casa-filtro-fim');
@@ -247,6 +260,14 @@ function renderTabela() {
 // DRAG & DROP — REORDENAR COLUNAS
 // ────────────────────────────────────────────
 function setupColDrag(thead) {
+  // Reordenar coluna grava em config/contas_casa_colunas. Em modo somente
+  // leitura nem chegamos a ligar o drag: melhor a coluna não sair do lugar
+  // do que ela se mover na tela e a gravação ser recusada depois.
+  if (!podeEditar('contas-casa')) {
+    thead.querySelectorAll('th[draggable]').forEach(th => th.setAttribute('draggable', 'false'));
+    return;
+  }
+
   const ths = [...thead.querySelectorAll('th[draggable]')];
   let dragIdx = null;
 
@@ -297,6 +318,7 @@ function setupColDrag(thead) {
 // AÇÕES — SALVO IMEDIATAMENTE NO FIRESTORE
 // ────────────────────────────────────────────
 async function toggleStatus(mesId, colName) {
+  if (bloqueado()) return;
   const cols  = meses[mesId]?.colunas || {};
   const atual = cols[colName]?.status || 'naoPago';
   const novo  = atual === 'Pago' ? 'naoPago' : 'Pago';
@@ -312,6 +334,7 @@ async function toggleStatus(mesId, colName) {
 }
 
 async function toggleEquilibrio(mesId) {
+  if (bloqueado()) return;
   const atual = meses[mesId]?.equilibrioPago === true;
   try {
     await setDoc(doc(db, 'contas_casa', mesId), {
@@ -324,6 +347,7 @@ async function toggleEquilibrio(mesId) {
 }
 
 function editarCelula(mesId, colName) {
+  if (bloqueado()) return;
   const cols    = meses[mesId]?.colunas || {};
   const current = cols[colName] || {};
   const valor   = current.valor || 0;
@@ -364,6 +388,7 @@ function editarCelula(mesId, colName) {
 // GERENCIAR MESES E COLUNAS
 // ────────────────────────────────────────────
 async function adicionarMes() {
+  if (bloqueado()) return;
   const ids    = Object.keys(meses).sort();
   const ultimo = ids.length > 0 ? ids[ids.length - 1] : mesAtualId();
   const [y, m] = ultimo.split('-').map(Number);
@@ -390,6 +415,7 @@ async function adicionarMes() {
 }
 
 function adicionarColuna() {
+  if (bloqueado()) return;
   openModal(
     'Nova Conta da Casa',
     `<div class="form-group">
@@ -431,6 +457,7 @@ function adicionarColuna() {
 }
 
 function editarResponsavelPadrao(nome) {
+  if (bloqueado()) return;
   const atual = colunasConfig[nome]?.defaultPagante || 'Digo';
   openModal(
     `Editar responsável — ${nome}`,
@@ -469,6 +496,7 @@ function editarResponsavelPadrao(nome) {
 }
 
 function removerColuna(nome) {
+  if (bloqueado()) return;
   openModal(
     `Remover conta "${nome}"`,
     `<p>Remove a coluna <strong>${nome}</strong> de todos os meses. Os valores serão perdidos.</p>`,
