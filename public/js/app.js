@@ -17,7 +17,7 @@ import {
 import {
   carregarPermissoes, ehAdmin, podeVer, nomeUsuario, semAcessoNenhum
 } from './permissoes.js';
-import { SECOES_BELLA, GRUPO_BELLA, ORDEM_SIDEBAR_BELLA } from './secoes-bella.js';
+import { SECOES_BELLA_MENU, GRUPO_BELLA, ORDEM_SIDEBAR_BELLA } from './secoes-bella.js';
 
 // ──────────────────────────────────────────────
 // UTILIDADES GLOBAIS
@@ -216,11 +216,22 @@ const SECTION_TITLES = {
 
 const initialized = new Set();
 
+// Qual dashboard é a "casa" deste usuário. O admin entra no Dashboard geral;
+// quem tem dashboard próprio entra no seu — ter os dois no menu de uma pessoa
+// só seria confuso, já que um deles mostraria cards de sections que ela nem vê.
+let dashboardPadrao = 'dashboard';
+
+function definirDashboardPadrao() {
+  dashboardPadrao = (!ehAdmin() && podeVer('dashboard-bella'))
+    ? 'dashboard-bella'
+    : 'dashboard';
+}
+
 function activateSection(name) {
   // Trava de navegação: sem acesso, cai no dashboard em vez de abrir uma tela
   // que só encheria o console de "insufficient permissions". Vale para link
   // do menu, card do dashboard e chamada programática — todos passam por aqui.
-  if (!podeVer(name)) name = 'dashboard';
+  if (!podeVer(name)) name = dashboardPadrao;
 
   // Nav links
   document.querySelectorAll('.nav-link').forEach(l => {
@@ -324,7 +335,7 @@ async function carregarConfiguracaoSections() {
 // para o admin. Na sidebar da própria Bella o cabeçalho não faz sentido:
 // ela não precisa de um rótulo dizendo que as sections dela são dela.
 function montarGrupoBella() {
-  const visiveis = SECOES_BELLA.filter(s => podeVer(s.chave));
+  const visiveis = SECOES_BELLA_MENU.filter(s => podeVer(s.chave));
   if (!visiveis.length) return;
 
   if (ehAdmin()) adicionarCabecalhoGrupo(GRUPO_BELLA);
@@ -393,7 +404,12 @@ function aplicarVisibilidadeFixas() {
     const key = link.dataset.section;
     if (!key || key.startsWith('custom-')) return;
     const li = link.closest('li');
-    if (li) li.style.display = (key === 'dashboard' || secaoVisivel(key)) ? '' : 'none';
+    // O Dashboard geral só entra no menu de quem o usa como casa — para a
+    // Bella ele mostraria cards de sections que ela nem enxerga.
+    const visivel = key === 'dashboard'
+      ? dashboardPadrao === 'dashboard'
+      : secaoVisivel(key);
+    if (li) li.style.display = visivel ? '' : 'none';
   });
   document.querySelectorAll('[data-dash-section]').forEach(card => {
     card.style.display = secaoVisivel(card.dataset.dashSection) ? '' : 'none';
@@ -601,8 +617,12 @@ onAuthStateChanged(auth, async user => {
 
   if (semAcessoNenhum()) { mostrarSemAcesso(user); return; }
 
+  // Antes de montar o menu: `aplicarVisibilidadeFixas` consulta o dashboard
+  // padrão para decidir se o Dashboard geral aparece.
+  definirDashboardPadrao();
+
   await carregarConfiguracaoSections();
-  activateSection('dashboard');
+  activateSection(dashboardPadrao);
 });
 
 // Tela em branco é o pior diagnóstico possível. Quem chega aqui ou é um

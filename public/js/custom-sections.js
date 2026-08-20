@@ -32,6 +32,7 @@ export function montarSecaoCustomizada(container, secao) {
     case 'patrimonio':   return montarPatrimonio(container, secao);
     case 'carro':        return montarCarro(container, secao);
     case 'devo-devem':   return montarDevoDevem(container, secao);
+    case 'dashboard-grupo': return montarDashboardGrupo(container, secao);
     default:
       container.innerHTML = `<p class="empty-state">Template "${esc(secao.template)}" desconhecido.</p>`;
   }
@@ -40,6 +41,63 @@ export function montarSecaoCustomizada(container, secao) {
 // ──────────────────────────────────────────────
 // MÉTRICA PARA O CARD DO DASHBOARD
 // ──────────────────────────────────────────────
+// ──────────────────────────────────────────────
+// TEMPLATE: DASHBOARD DE GRUPO
+// ──────────────────────────────────────────────
+/**
+ * Painel de um conjunto de sections — um card por section, com a mesma
+ * métrica que o dashboard principal já calcula (`metricaSecao`).
+ *
+ * Cada card é carregado de forma independente e um card que falhe vira "—"
+ * em vez de derrubar o painel: este é o ponto de entrada de quem usa a
+ * section, então ele tem que abrir mesmo com uma coleção fora do ar.
+ */
+function montarDashboardGrupo(container, secao) {
+  const membros = secao.membros || [];
+
+  container.innerHTML = `
+    <div class="dashboard-grid" data-role="grid">
+      ${membros.map(m => `
+        <div class="card stat-card" data-card="${m.chave}" style="cursor:pointer" title="Abrir ${esc(m.nome)}">
+          <div class="stat-icon">${m.icone || '📁'}</div>
+          <div class="stat-info">
+            <div class="stat-value" data-role="valor-${m.chave}">…</div>
+            <div class="stat-label" data-role="label-${m.chave}">${esc(m.nome)}</div>
+            <div class="stat-sub" data-role="sub-${m.chave}">Carregando…</div>
+          </div>
+        </div>`).join('')}
+    </div>
+  `;
+
+  container.querySelectorAll('[data-card]').forEach(card => {
+    card.addEventListener('click', () => {
+      window.dispatchEvent(new CustomEvent('cf:ir-para-secao', { detail: { name: card.dataset.card } }));
+    });
+  });
+
+  membros.forEach(async m => {
+    const q = role => container.querySelector(`[data-role="${role}"]`);
+    try {
+      const metrica = await metricaSecao(m);
+      q(`valor-${m.chave}`).textContent = metrica?.principal?.valor ?? '—';
+      q(`label-${m.chave}`).textContent = metrica?.principal?.label ?? m.nome;
+      // A métrica secundária (ex.: "Devem" no Devo/Devem) entra na linha de
+      // apoio em vez de virar um segundo card: o painel é uma visão rápida,
+      // não a section inteira.
+      const extra = metrica?.secundaria
+        ? `${metrica.secundaria.label}: ${metrica.secundaria.valor}`
+        : (metrica?.sub || '');
+      q(`sub-${m.chave}`).textContent = `${m.nome}${extra ? ' · ' + extra : ''}`;
+    } catch {
+      q(`valor-${m.chave}`).textContent = '—';
+      q(`sub-${m.chave}`).textContent   = `${m.nome} · indisponível`;
+    }
+  });
+
+  // Sem card de anotações de propósito: o dashboard principal também não tem,
+  // e um painel de visão rápida não é lugar de recado.
+}
+
 export async function metricaSecao(secao) {
   switch (secao.template) {
     case 'banco': {

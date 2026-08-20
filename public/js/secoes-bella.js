@@ -69,6 +69,31 @@ export const SECOES_BELLA = [
 ];
 
 /**
+ * Dashboard da Bella.
+ *
+ * Não tem coleção própria: os números saem das sections listadas em
+ * `membros`, uma consulta por card. Por isso não precisa (nem deve ganhar)
+ * bloco em `firestore.rules` — cada card já é barrado ou liberado pela regra
+ * da coleção que ele lê.
+ *
+ * Mostra só as sections DELA, não as compartilhadas: Contas da Casa e Face
+ * pertencem ao admin e já têm card no dashboard dele. Repetir aqui daria a
+ * impressão de que fazem parte do conjunto dela.
+ */
+export const DASHBOARD_BELLA = {
+  chave:    'dashboard-bella',
+  slug:     'dashboard-bella',
+  nome:     'Dashboard',
+  titulo:   'Dashboard',
+  icone:    '📊',
+  template: 'dashboard-grupo',
+  membros:  SECOES_BELLA
+};
+
+/** O que entra no menu: o dashboard dela primeiro, depois as sections. */
+export const SECOES_BELLA_MENU = [DASHBOARD_BELLA, ...SECOES_BELLA];
+
+/**
  * Ordem do menu na visão da Bella.
  *
  * A ordem padrão viria da ordem do HTML (sections fixas) seguida das
@@ -79,7 +104,7 @@ export const SECOES_BELLA = [
  * listadas. Na prática são as sections que ela não vê, então não aparecem.
  */
 export const ORDEM_SIDEBAR_BELLA = [
-  'dashboard',
+  'dashboard-bella',
   'distribuicao-bella',
   'banco-bella',
   'devo-devem-bella',
