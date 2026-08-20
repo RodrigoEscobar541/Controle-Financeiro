@@ -16,6 +16,7 @@
 import { db } from './firebase-config.js';
 import { fmtBRL, fmtDate, mesAtualId, mesAtualLabel, idToLabel, showToast, openModal } from './app.js';
 import { initNotas } from './notas.js';
+import { podeVer } from './permissoes.js';
 import { subscribeTiposCombustivel, adicionarTipoCombustivel, abrirModalGerenciarTipos } from './combustivel-tipos.js';
 import {
   collection, query, orderBy, where, onSnapshot,
@@ -53,7 +54,15 @@ export function montarSecaoCustomizada(container, secao) {
  * section, então ele tem que abrir mesmo com uma coleção fora do ar.
  */
 function montarDashboardGrupo(container, secao) {
-  const membros = secao.membros || [];
+  // Filtra pelo que o visitante pode ler. Sem isso, revogar o acesso a uma
+  // section deixaria o card dela no painel exibindo "indisponível" — o que
+  // parece defeito, e não decisão de permissão.
+  const membros = (secao.membros || []).filter(m => podeVer(m.chave));
+
+  if (!membros.length) {
+    container.innerHTML = `<p class="empty-state">Nenhuma section liberada para exibir aqui.</p>`;
+    return;
+  }
 
   container.innerHTML = `
     <div class="dashboard-grid" data-role="grid">
@@ -129,6 +138,30 @@ export async function metricaSecao(secao) {
       return {
         principal: { label: `Total ${mesAtualLabel()}`, valor: fmtBRL(total) },
         sub: snap.exists() ? 'Mês cadastrado' : 'Mês ainda não cadastrado'
+      };
+    }
+    // Mesma forma de dado da distribuição (doc por mês, mapa de colunas), mas
+    // com caso próprio em vez de reaproveitar o template acima: aqui cada
+    // coluna tem `status`, e separar o pago do total é o que a section
+    // realmente responde. Fundir os dois esconderia isso.
+    case 'contas-casa': {
+      const snap = await getDoc(doc(db, secao.colecoes.mensal, mesAtualId()));
+      if (!snap.exists()) {
+        return {
+          principal: { label: `Total ${mesAtualLabel()}`, valor: fmtBRL(0) },
+          sub: 'Mês ainda não cadastrado'
+        };
+      }
+      const cols = Object.values(snap.data().colunas || {});
+      let total = 0, pago = 0;
+      cols.forEach(c => {
+        const v = parseFloat(c.valor) || 0;
+        total += v;
+        if (c.status === 'Pago') pago += v;
+      });
+      return {
+        principal:  { label: `Total ${mesAtualLabel()}`, valor: fmtBRL(total) },
+        secundaria: { label: 'Já pago', valor: fmtBRL(pago) }
       };
     }
     case 'carro': {

@@ -69,6 +69,34 @@ export const SECOES_BELLA = [
 ];
 
 /**
+ * Sections do admin que a Bella também acessa.
+ *
+ * Não são replicadas: apontam para as coleções originais (`contas_casa`,
+ * `face`), as mesmas que o admin usa. Entram aqui só para render­izar card no
+ * dashboard dela — quem decide se ela pode lê-las é `permissoes/{uid}`.
+ *
+ * A Face cai no template `carro` sem adaptação (mesma coleção com campo
+ * `tipo`). Contas da Casa tem formato próprio — doc por mês com mapa de
+ * colunas — e por isso ganhou um caso em `metricaSecao`.
+ */
+export const SECOES_COMPARTILHADAS = [
+  {
+    chave:    'contas-casa',
+    nome:     'Contas Casa',
+    icone:    '🏠',
+    template: 'contas-casa',
+    colecoes: { mensal: 'contas_casa' }
+  },
+  {
+    chave:    'face',
+    nome:     'Face',
+    icone:    '🚙',
+    template: 'carro',
+    colecoes: { principal: 'face' }
+  }
+];
+
+/**
  * Dashboard da Bella.
  *
  * Não tem coleção própria: os números saem das sections listadas em
@@ -76,9 +104,9 @@ export const SECOES_BELLA = [
  * bloco em `firestore.rules` — cada card já é barrado ou liberado pela regra
  * da coleção que ele lê.
  *
- * Mostra só as sections DELA, não as compartilhadas: Contas da Casa e Face
- * pertencem ao admin e já têm card no dashboard dele. Repetir aqui daria a
- * impressão de que fazem parte do conjunto dela.
+ * Inclui as compartilhadas: o dashboard dela é a casa dela, e esconder ali
+ * justamente o que ela divide com o admin tiraria do painel a informação
+ * que mais muda no dia a dia.
  */
 export const DASHBOARD_BELLA = {
   chave:    'dashboard-bella',
@@ -87,7 +115,7 @@ export const DASHBOARD_BELLA = {
   titulo:   'Dashboard',
   icone:    '📊',
   template: 'dashboard-grupo',
-  membros:  SECOES_BELLA
+  membros:  [...SECOES_BELLA, ...SECOES_COMPARTILHADAS]
 };
 
 /** O que entra no menu: o dashboard dela primeiro, depois as sections. */
