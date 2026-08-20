@@ -17,6 +17,7 @@ import {
 import {
   carregarPermissoes, ehAdmin, podeVer, nomeUsuario, semAcessoNenhum
 } from './permissoes.js';
+import { SECOES_BELLA, GRUPO_BELLA } from './secoes-bella.js';
 
 // ──────────────────────────────────────────────
 // UTILIDADES GLOBAIS
@@ -247,6 +248,11 @@ function activateSection(name) {
     else if (name === 'focus')        initFocus();
     else if (name === 'face')         initFace();
     else if (name === 'devo-devem')   initDevoDeve();
+    else if (secoesExtrasMap.has(name)) {
+      const secao = secoesExtrasMap.get(name);
+      if (target) montarSecaoCustomizada(target, secao);
+      return; // montarSecaoCustomizada já chama initNotas internamente
+    }
     else if (name.startsWith('custom-')) {
       const secao = secoesCustomizadasMap.get(name.slice('custom-'.length));
       if (secao && target) montarSecaoCustomizada(target, secao);
@@ -271,6 +277,10 @@ window.addEventListener('cf:ir-para-secao', e => activateSection(e.detail.name))
 // ──────────────────────────────────────────────
 let secoesOcultas = [];
 const secoesCustomizadasMap = new Map(); // slug -> documento da section
+// Sections de outro usuário (hoje, as da Bella). Chaveadas pela `chave`, que
+// é a mesma string usada na permissão — diferente das customizadas, que vivem
+// no Firestore e são chaveadas por slug com prefixo "custom-".
+const secoesExtrasMap = new Map();       // chave -> definição da section
 
 function escApp(str) {
   return String(str ?? '')
@@ -288,6 +298,45 @@ async function carregarConfiguracaoSections() {
     const secoes = await carregarSecoesCustomizadas();
     secoes.filter(s => s.ativo).forEach(registrarSecaoCustomizadaNoDOM);
   } catch { /* sem sections customizadas cadastradas ainda */ }
+
+  montarGrupoBella();
+}
+
+// ── Sections da Bella ─────────────────────────────────────────────
+// Entram no fim do menu, atrás de um cabeçalho com o nome dela — mas só
+// para o admin. Na sidebar da própria Bella o cabeçalho não faz sentido:
+// ela não precisa de um rótulo dizendo que as sections dela são dela.
+function montarGrupoBella() {
+  const visiveis = SECOES_BELLA.filter(s => podeVer(s.chave));
+  if (!visiveis.length) return;
+
+  if (ehAdmin()) adicionarCabecalhoGrupo(GRUPO_BELLA);
+  visiveis.forEach(registrarSecaoExtraNoDOM);
+  limparGruposVazios();
+}
+
+function registrarSecaoExtraNoDOM(secao) {
+  secoesExtrasMap.set(secao.chave, secao);
+  SECTION_TITLES[secao.chave] = secao.titulo || secao.nome;
+
+  const li = document.createElement('li');
+  li.dataset.extraNav = secao.chave;
+  li.innerHTML = `
+    <a href="#" class="nav-link" data-section="${secao.chave}">
+      <span class="nav-icon">${secao.icone || '📁'}</span>
+      <span class="nav-label">${escApp(secao.nome)}</span>
+    </a>`;
+  document.querySelector('.nav-list').appendChild(li);
+  li.querySelector('.nav-link').addEventListener('click', e => {
+    e.preventDefault();
+    activateSection(secao.chave);
+    closeSidebar();
+  });
+
+  const section = document.createElement('section');
+  section.id = `section-${secao.chave}`;
+  section.className = 'content-section';
+  document.querySelector('.main-content').appendChild(section);
 }
 
 // Uma section some do menu por DOIS motivos diferentes, que nunca devem ser

@@ -113,15 +113,30 @@ function esc(str) {
     .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
+/**
+ * Chave da section — usada no `data-section`, nos ids do DOM e como id do
+ * documento em `notas/{chave}`.
+ *
+ * Sections criadas pelo "+ Nova Section" continuam com `custom-{slug}`. As
+ * sections fixas de outro usuário passam a `chave` explícita, porque essa
+ * mesma string é a chave de permissão em `permissoes/{uid}.secoes` e em
+ * `firestore.rules` — se a nota usasse um prefixo diferente do da permissão,
+ * a pessoa enxergaria a section e levaria "sem permissão" ao escrever nela.
+ */
+function chaveSecao(secao) {
+  return secao.chave || `custom-${secao.slug}`;
+}
+
 function notasHTML(secao) {
+  const chave = chaveSecao(secao);
   return `
     <div class="notas-card">
       <div class="notas-header">
         <span class="notas-icon">📝</span>
         <span class="notas-title">Anotações</span>
-        <span class="notas-status" id="notas-status-custom-${secao.slug}"></span>
+        <span class="notas-status" id="notas-status-${chave}"></span>
       </div>
-      <textarea class="notas-textarea" id="notas-custom-${secao.slug}" placeholder="Deixe recados sobre ${esc(secao.nome)}…"></textarea>
+      <textarea class="notas-textarea" id="notas-${chave}" placeholder="Deixe recados sobre ${esc(secao.nome)}…"></textarea>
     </div>`;
 }
 
@@ -241,16 +256,33 @@ function montarBanco(container, secao) {
     });
   }
 
-  initNotas(`custom-${secao.slug}`);
+  initNotas(chaveSecao(secao));
 }
 
 // ──────────────────────────────────────────────
 // TEMPLATE: PATRIMÔNIO
 // ──────────────────────────────────────────────
 function montarPatrimonio(container, secao) {
-  const colecao = secao.colecoes.principal;
+  const colecao     = secao.colecoes.principal;
+  // Opcional de propósito: as sections criadas pelo "+ Nova Section" não têm
+  // coleção de reservas e continuam com uma tabela só, como sempre tiveram.
+  const colReservas = secao.colecoes.reservas || null;
+
+  const reservasHTML = colReservas ? `
+    <div class="card">
+      <div class="card-header">
+        <h3 class="card-title">Reservas</h3>
+        <button class="btn btn-primary" data-role="btn-nova-reserva">+ Nova Reserva</button>
+      </div>
+      <table class="data-table">
+        <thead><tr><th>Reserva</th><th>Onde está</th><th class="text-right">Valor (R$)</th><th></th></tr></thead>
+        <tbody data-role="res-tbody"><tr><td colspan="4" class="loading">Carregando...</td></tr></tbody>
+        <tfoot><tr><td colspan="2"><strong>Total</strong></td><td class="text-right"><strong data-role="res-total">R$ 0,00</strong></td><td></td></tr></tfoot>
+      </table>
+    </div>` : '';
 
   container.innerHTML = `
+    ${reservasHTML}
     <div class="card">
       <div class="card-header">
         <h3 class="card-title">${secao.icone || '💎'} ${esc(secao.nome)}</h3>
@@ -267,6 +299,80 @@ function montarPatrimonio(container, secao) {
 
   const q = role => container.querySelector(`[data-role="${role}"]`);
   let ativos = [];
+
+  // ── Reservas ───────────────────────────────────────────────────
+  // Tabela irmã da de ativos, com total próprio. Fica separada de propósito:
+  // reserva é dinheiro parado para emergência, não investimento — somar as
+  // duas num total só esconderia exatamente a informação que importa.
+  if (colReservas) {
+    let reservas = [];
+
+    const formReservaHtml = (r = {}) => `
+      <div class="form-group"><label>Reserva</label><input type="text" id="cx-res-nome" value="${esc(r.nome || '')}" placeholder="Ex: Emergência, Viagem"></div>
+      <div class="form-group"><label>Onde está</label><input type="text" id="cx-res-onde" value="${esc(r.ondeEsta || '')}" placeholder="Ex: Nubank CDB"></div>
+      <div class="form-group"><label>Valor (R$)</label><input type="number" id="cx-res-valor" value="${r.valor ?? ''}" step="0.01" min="0" placeholder="0,00"></div>`;
+
+    const lerFormReserva = () => {
+      const nome     = document.getElementById('cx-res-nome').value.trim();
+      const ondeEsta = document.getElementById('cx-res-onde').value.trim();
+      const valor    = parseFloat(document.getElementById('cx-res-valor').value);
+      if (!nome || !ondeEsta || isNaN(valor) || valor < 0) { showToast('Preencha todos os campos.', 'error'); return null; }
+      return { nome, ondeEsta, valor };
+    };
+
+    q('btn-nova-reserva').addEventListener('click', () => {
+      openModal('Nova Reserva', formReservaHtml(), async () => {
+        const dados = lerFormReserva();
+        if (!dados) return;
+        try { await addDoc(collection(db, colReservas), dados); showToast('Reserva adicionada!', 'success'); }
+        catch { showToast('Erro ao adicionar reserva.', 'error'); }
+      }, 'Adicionar');
+    });
+
+    onSnapshot(collection(db, colReservas), snap => {
+      reservas = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      renderReservas();
+    }, () => showToast('Erro ao carregar reservas.', 'error'));
+
+    function renderReservas() {
+      const tbody = q('res-tbody');
+      if (!reservas.length) {
+        tbody.innerHTML = `<tr><td colspan="4" class="empty-state">Nenhuma reserva cadastrada. Clique em "+ Nova Reserva".</td></tr>`;
+        q('res-total').textContent = 'R$ 0,00';
+        return;
+      }
+      let total = 0;
+      tbody.innerHTML = reservas.map(r => {
+        total += parseFloat(r.valor) || 0;
+        return `<tr>
+          <td><strong>${esc(r.nome)}</strong></td>
+          <td>${esc(r.ondeEsta)}</td>
+          <td class="text-right">${fmtBRL(r.valor)}</td>
+          <td style="text-align:center;white-space:nowrap">
+            <button class="btn-icon" data-res-action="edit" data-id="${r.id}" title="Editar">✏️</button>
+            <button class="btn-icon" data-res-action="delete" data-id="${r.id}" title="Excluir">🗑️</button>
+          </td>
+        </tr>`;
+      }).join('');
+      q('res-total').textContent = fmtBRL(total);
+
+      tbody.querySelectorAll('[data-res-action="edit"]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const reserva = reservas.find(r => r.id === btn.dataset.id);
+          if (!reserva) return;
+          openModal(`Editar — ${esc(reserva.nome)}`, formReservaHtml(reserva), async () => {
+            const dados = lerFormReserva();
+            if (!dados) return;
+            try { await updateDoc(doc(db, colReservas, reserva.id), dados); showToast('Reserva atualizada!', 'success'); }
+            catch { showToast('Erro ao atualizar.', 'error'); }
+          }, 'Salvar');
+        });
+      });
+      tbody.querySelectorAll('[data-res-action="delete"]').forEach(btn => {
+        btn.addEventListener('click', () => confirmarExclusaoSimples(colReservas, btn.dataset.id, reservas, 'nome'));
+      });
+    }
+  }
 
   function formHtml(a = {}) {
     return `
@@ -333,7 +439,7 @@ function montarPatrimonio(container, secao) {
     });
   }
 
-  initNotas(`custom-${secao.slug}`);
+  initNotas(chaveSecao(secao));
 }
 
 // ──────────────────────────────────────────────
@@ -596,7 +702,7 @@ function montarDistribuicao(container, secao) {
     );
   }
 
-  initNotas(`custom-${secao.slug}`);
+  initNotas(chaveSecao(secao));
 }
 
 // ──────────────────────────────────────────────
@@ -939,7 +1045,7 @@ function montarCarro(container, secao) {
     selectTipo.addEventListener('change', () => { novoWrap.style.display = selectTipo.value === '__novo__' ? '' : 'none'; });
   }
 
-  initNotas(`custom-${secao.slug}`);
+  initNotas(chaveSecao(secao));
 }
 
 // ──────────────────────────────────────────────
@@ -1151,5 +1257,5 @@ function montarDevoDevem(container, secao) {
     );
   }
 
-  initNotas(`custom-${secao.slug}`);
+  initNotas(chaveSecao(secao));
 }
