@@ -14,6 +14,11 @@ Atue como um engenheiro de software com 20 anos de experiencia, qualquer duvida 
 - **Sempre fazer push no GitHub** (não no Firebase diretamente — o GitHub Actions faz o deploy automático)
 - **Queries ao Firestore devem ficar na pasta `Querys/`** (para o bot Render)
 - **Sempre que alterar código que o Agente usa, atualizar `Agente_Financeiro_IA.md`** para garantir que o agente não quebre
+- **Regras de segurança só no `firestore.rules` do repositório** — nunca colar direto no console do Firebase, que sobrescreve o arquivo em silêncio e faz a versão do Git mentir sobre o que está no ar. Validar com `firebase deploy --only firestore:rules --dry-run` antes de publicar
+- **Toda coleção nova precisa do bloco dela em `firestore.rules`** — o catch-all libera só o admin, então uma coleção esquecida fica invisível para o convidado sem nenhum aviso
+- **Esconder botão na tela não é segurança.** Toda restrição no front-end precisa da regra equivalente no `firestore.rules`; sozinha, no JS, ela não vale nada
+- **O bot e o Agente IA ignoram as regras** — usam `firebase-admin` (service account), que passa por cima do `firestore.rules`. Restrição de convidado no bot tem que ser checada em código
+- **1 coleção por section** (ver `Arquitetura_BD_Firestore.md`) — não é só organização: é o que torna o controle de acesso possível, porque as regras do Firestore liberam ou negam um *caminho*, não documentos dentro de uma query
 ## Git Commit Convention
 
 Sempre que realizar um commit, seguir o padrão **Conventional Commits**.

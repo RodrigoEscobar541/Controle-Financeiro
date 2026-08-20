@@ -37,12 +37,18 @@ Controle-Financeiro/
 │   └── js/
 │       ├── firebase-config.js     ← ⚠️ PREENCHA com suas credenciais Firebase
 │       ├── auth.js                ← Autenticação (login/logout)
+│       ├── permissoes.js          ← Papel do usuário: podeVer / podeEditar
+│       ├── secoes-bella.js        ← Registro das sections do 2º usuário
 │       ├── app.js                 ← Controlador principal + utilitários
 │       ├── dashboard.js           ← Section Dashboard
 │       ├── banco.js               ← Section Banco (entradas/saídas)
 │       ├── distribuicao.js        ← Section Distribuição Mensal
 │       ├── patrimonio.js          ← Section Patrimônio
-│       └── contas-casa.js         ← Section Contas da Casa
+│       ├── contas-casa.js         ← Section Contas da Casa
+│       ├── section-templates.js   ← Registro de sections fixas e templates
+│       └── custom-sections.js     ← Monta sections a partir de um template
+│
+├── firestore.rules                ← Regras de segurança (NÃO edite pelo console)
 │
 ├── Querys/                        ← Queries Firestore (usadas pelo bot Render)
 │   ├── banco-queries.js
@@ -317,18 +323,82 @@ Após configurar os Secrets, qualquer push na branch `main` com alterações em 
 
 ## Regras do Firestore (Segurança)
 
-Configure no Console Firebase → Firestore → Regras:
+> ⚠️ **Não configure regras pelo console.** Elas vivem em **`firestore.rules`,
+> versionado na raiz do repositório**. Colar regras direto no console
+> sobrescreve o arquivo silenciosamente — e a versão que está no Git passa a
+> mentir sobre o que está no ar.
+>
+> A regra genérica `allow read, write: if request.auth != null`, que já esteve
+> aqui, hoje **desfaria todo o controle de acesso**: liberaria a Bella para ler
+> e escrever tudo, inclusive o que ela nem vê na tela.
 
+O modelo é **admin + convidados** — ver `Arquitetura_BD_Firestore.md`, seção
+"Acesso: admin e convidados", para a estrutura completa.
+
+**Antes de mudar as regras**, valide sem publicar:
+
+```bash
+firebase deploy --only firestore:rules --dry-run
 ```
-rules_version = '2';
-service cloud.firestore {
-  match /databases/{database}/documents {
-    match /{document=**} {
-      allow read, write: if request.auth != null;
-    }
-  }
-}
+
+**Para publicar:** faça push do `firestore.rules` para o `main`. O workflow
+`.github/workflows/deploy-firestore-rules.yml` cuida do resto.
+
+> 🔧 **Pendência conhecida:** esse workflow falha hoje com
+> `403 Permission denied to get service [firestore.googleapis.com]`. A conta de
+> serviço do secret `FIREBASE_SERVICE_ACCOUNT` foi criada só para Hosting e
+> precisa dos papéis **Firebase Rules Admin** e **Service Usage Consumer** no
+> Google Cloud. Enquanto isso não for concedido, mudanças em regras não sobem
+> pelo CI.
+
+---
+
+## Multiusuário (admin e convidados)
+
+O sistema nasceu para um usuário só e ganhou um segundo em 20/08/2026.
+
+| Papel | Como é identificado | O que enxerga |
+|---|---|---|
+| **Admin** | custom claim `admin: true` no token | tudo |
+| **Convidado** | documento `permissoes/{uid}` | só as sections listadas nele |
+
+O claim de admin **não custa leitura**: viaja dentro do próprio token de
+autenticação. Só o convidado paga um `get()` do documento de permissões.
+
+### Conceder e revogar acesso
+
+```bash
+cd "Bot Render"
+npm install                                              # uma vez
+
+node scripts/definir-acesso.js admin seu-email@gmail.com
+node scripts/definir-acesso.js convidado <uid|email> "Nome" contas-casa:leitura face:escrita
+node scripts/definir-acesso.js listar                    # o que está valendo
+node scripts/definir-acesso.js convidado <uid|email> "Nome" face:nenhum   # revogar
 ```
+
+Níveis: `leitura`, `escrita`, `nenhum`. Rodar de novo **mescla** — conceder
+uma section não revoga as outras.
+
+### ⚠️ Ordem importa no primeiro deploy
+
+As regras fecham tudo para quem não é admin. Publicá-las **antes** de definir
+o admin tranca você para fora do próprio app. A ordem correta é:
+
+1. `definir-acesso.js admin <seu-email>`
+2. conferir com `listar`
+3. só então publicar
+
+Se a ordem for invertida, o app mostra uma tela "Sem acesso" explicando o
+conserto, em vez de abrir em branco.
+
+### ⚠️ O bot e o Agente IA ignoram as regras
+
+`Bot Render/` usa `firebase-admin` (service account), que **passa por cima de
+`firestore.rules` por completo**. Qualquer restrição de convidado no bot
+precisa ser checada em código. Hoje o bot atende um único `chat_id`
+autorizado (o do admin) — se um convidado ganhar acesso ao bot, essa checagem
+passa a ser obrigatória.
 
 ---
 
@@ -375,3 +445,44 @@ O agente tem acesso a ferramentas:
 | Distribuição | `#distribuicao` | Planilha de distribuição do salário por mês |
 | Patrimônio | `#patrimonio` | Lista de ativos e investimentos |
 | Contas Casa | `#contas-casa` | Contas domésticas Digo/Bella por mês |
+| Focus | `#focus` | Carro: a fazer, feitos, manutenções, abastecimentos |
+| Face | `#face` | Idem, para o outro carro |
+| Devo / Devem | `#devo-devem` | Dívidas em aberto e quitadas, por parcela |
+
+### Sections da Bella (2º usuário)
+
+Definidas em `public/js/secoes-bella.js` e montadas por `custom-sections.js` —
+não têm HTML próprio. Usam coleções com sufixo `_bella`, ao lado das
+existentes; nenhum dado do admin é compartilhado por elas.
+
+| Section | Chave de permissão | Coleções |
+|---|---|---|
+| Dashboard | `dashboard-bella` | nenhuma (agrega as demais) |
+| Distribuição | `distribuicao-bella` | `distribuicao_mensal_bella` + `config/distribuicao_colunas_bella` |
+| Banco | `banco-bella` | `banco_bella` |
+| Devo / Devem | `devo-devem-bella` | `dividas_bella` |
+| Patrimônio | `patrimonio-bella` | `patrimonio_bella`, `reservas_bella` |
+
+O **Patrimônio dela não tem gráfico de pizza** nem a coluna "Tipo de
+investimento" — só as tabelas de Reservas e de Ativos.
+
+**Compartilhadas com o admin** (coleções originais, sem cópia): Contas da Casa
+em `leitura` e Face em `escrita`. As duas aparecem como card no dashboard
+dela — a Face com consumo médio (km/L e custo por km), a mesma conta do
+dashboard do admin.
+
+> A **chave** de cada section é a mesma string em três lugares: `data-section`
+> no menu, id do documento em `notas/{chave}` e chave em
+> `permissoes/{uid}.secoes`. Divergir em qualquer um deles faz a section
+> aparecer e quebrar com "sem permissão" ao ser usada.
+
+### Ordem do menu
+
+O admin vê as sections fixas na ordem do HTML e, ao final, o grupo **BELLA**
+atrás de um cabeçalho. O convidado vê a própria ordem, definida em
+`ORDEM_SIDEBAR_BELLA`, sem cabeçalho — ele não precisa de um rótulo dizendo
+que as sections dele são dele.
+
+Cada usuário tem **um** dashboard: o admin entra no Dashboard geral, o
+convidado no dele. Ter os dois no mesmo menu mostraria cards de sections que a
+pessoa não enxerga.

@@ -284,6 +284,27 @@ customizadas usam `custom-{slug}`).
 "focus": { texto: "Lembrar de levar pro alinhamento em julho" }
 ```
 
+### Coleções da Bella (`*_bella`)
+Mesmo esquema das originais, só o nome muda. Criadas em 20/08/2026 com a
+entrada do 2º usuário.
+
+| Coleção | Espelha | Esquema |
+|---|---|---|
+| `banco_bella`               | `banco`               | idêntico |
+| `distribuicao_mensal_bella` | `distribuicao_mensal`  | idêntico |
+| `patrimonio_bella`          | `patrimonio`           | sem `tipoInvestimento` (a section dela não tem gráfico) |
+| `reservas_bella`            | `reservas`             | idêntico |
+| `dividas_bella`             | `dividas`              | idêntico |
+
+Não há `patrimonioDivisoes_bella`: a section de Patrimônio dela não tem
+gráfico de pizza, então não existem divisões a cadastrar.
+
+Não há `banco_meta_bella`: o agregado de saldo existe para o **bot**
+(`Querys/banco-queries.js`), e o bot ainda não opera sobre as coleções dela.
+Se um dia operar, criar o agregado junto — sem ele, `getSaldo` faz full-scan.
+
+O doc de config correspondente é `config/distribuicao_colunas_bella`.
+
 ### `agente_log`
 Registro automático de cada interação do Agente IA (mensagem do usuário,
 resposta e lista de ações realizadas no BD — leituras, escritas, exclusões).

@@ -41,3 +41,13 @@ Termos usados nos arquivos de documentação deste projeto.
 | **CI/CD** | Continuous Integration / Continuous Deployment — automação de testes e publicações |
 | **Plano Spark** | Plano gratuito do Firebase (50k leituras/dia, 20k gravações/dia, 20k exclusões/dia) |
 | **Render** | site que escuta o bot do telegram para receber mensagem, mesmo que o railway, mas esse é o que estou usando por ser gratuito forever |
+| **Admin** | Usuário que vê e edita tudo. Identificado por *custom claim* no token, não por documento no banco |
+| **Convidado** | Usuário que só vê as sections liberadas para ele em `permissoes/{uid}` |
+| **Custom Claim** | Campo gravado dentro do token de autenticação do Firebase (ex.: `admin: true`). Não custa leitura ao banco, mas só entra em vigor quando o token é renovado |
+| **Nível de acesso** | O que um convidado pode fazer numa section: `leitura`, `escrita` ou `nenhum` (ausente = sem acesso) |
+| **Chave da section** | String que identifica a section no menu (`data-section`), nas anotações (`notas/{chave}`) e na permissão. Tem que ser a mesma nos três |
+| **Section compartilhada** | Section do admin que um convidado também acessa. Aponta para a coleção original — não há cópia dos dados |
+| **firestore.rules** | Arquivo versionado no repositório com as regras de segurança. É a trava real; esconder botão na tela não é segurança |
+| **Somente leitura** | Modo em que a section é exibida sem nenhum caminho de escrita (botões escondidos, células não clicáveis, colunas não arrastáveis) |
+| **Sufixo `_bella`** | Convenção de nome das coleções do 2º usuário (`banco_bella`, `dividas_bella`), para separar os dados já no console do Firestore |
+| **Batch (writeBatch)** | Escrita em lote no Firestore, até 500 operações. Usado ao renomear coluna, que reescreve todos os meses de uma vez |

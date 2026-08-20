@@ -152,6 +152,39 @@ agente_log/{id}                 // registro automático de cada interação
 
 ---
 
+### ⚠️ O que o agente NÃO conhece (desde 20/08/2026)
+
+Com a entrada do 2º usuário, o banco ganhou coleções que **o prompt do agente
+em `Bot Render/commands/agente.js` ainda não descreve**:
+
+`banco_bella`, `distribuicao_mensal_bella`, `patrimonio_bella`,
+`reservas_bella`, `dividas_bella`, `config/distribuicao_colunas_bella`,
+`permissoes`.
+
+Consequências práticas, enquanto o prompt não for atualizado:
+
+- Perguntas sobre as finanças da Bella são respondidas **como se os dados não
+  existissem** — o agente não sabe onde procurar.
+- Números "totais" que ele apresentar cobrem só as coleções do admin. Isso é
+  o comportamento desejado hoje (o agente atende o admin), mas deixa de ser
+  se um dia ele passar a atender os dois.
+
+### ⚠️ O agente ignora as regras de segurança
+
+O agente usa `firebase-admin` (service account), que **passa por cima do
+`firestore.rules` por completo**. As permissões de convidado não valem nada
+aqui.
+
+Hoje isso não é brecha porque o bot só responde ao `chat_id` autorizado do
+admin (`TELEGRAM_CHAT_ID_AUTORIZADO` em `Bot Render/index.js`). **Essa é a
+única barreira.** Se um convidado ganhar acesso ao bot, será preciso:
+
+1. mapear `chat_id → uid`;
+2. checar `permissoes/{uid}` **em código**, antes de cada leitura e escrita;
+3. impedir que ele crie section fora do escopo dele.
+
+---
+
 ## Estrutura do App Web (para contexto do agente)
 
 O app web é organizado como uma planilha com as seções:
