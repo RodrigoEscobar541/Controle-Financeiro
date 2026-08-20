@@ -153,6 +153,16 @@ investidos). Um documento por reserva.
 
 ### `distribuicao_mensal`
 Distribuição mensal do salário. Um documento por mês (`YYYY-MM`).
+
+> **O nome da coluna é a chave do mapa, não um rótulo.** Renomear uma coluna
+> (botão ✏️ no cabeçalho) reescreve o mapa `colunas` de **todos os meses já
+> lançados**, num `writeBatch` em lotes de 400 — e o histórico inteiro passa a
+> exibir o nome novo, não só dali pra frente. A gravação escreve o mapa
+> `colunas` inteiro em vez de usar caminho de campo (`colunas.${nome}`), senão
+> um nome com ponto viraria campo aninhado. O array em `config` é atualizado
+> por **último**: se um lote falhar, o nome antigo continua valendo e a tabela
+> segue coerente. Renomear para um nome que já teve lançamentos é recusado —
+> sobrescreveria valores antigos sem aviso.
 ```
 "2026-06": {
   dataMes: "06-2026",

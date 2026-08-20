@@ -20,7 +20,7 @@ import { podeVer } from './permissoes.js';
 import { subscribeTiposCombustivel, adicionarTipoCombustivel, abrirModalGerenciarTipos } from './combustivel-tipos.js';
 import {
   collection, query, orderBy, where, onSnapshot,
-  addDoc, updateDoc, deleteDoc, doc, getDoc, getDocs, setDoc, deleteField
+  addDoc, updateDoc, deleteDoc, doc, getDoc, getDocs, setDoc, deleteField, writeBatch
 } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
 
 // ──────────────────────────────────────────────
@@ -609,6 +609,7 @@ function montarDistribuicao(container, secao) {
     const thCols = colunas.map(col => `
       <th draggable="true" data-col="${esc(col)}">
         <span class="col-name">${esc(col)}</span>
+        <span class="edit-col-btn" data-col="${esc(col)}" title="Renomear coluna" draggable="false">✏️</span>
         <span class="delete-col-btn" data-col="${esc(col)}" title="Remover coluna" draggable="false">✕</span>
       </th>
     `).join('');
@@ -616,6 +617,9 @@ function montarDistribuicao(container, secao) {
 
     thead.querySelectorAll('.delete-col-btn').forEach(btn => {
       btn.addEventListener('click', e => { e.stopPropagation(); removerColuna(btn.dataset.col); });
+    });
+    thead.querySelectorAll('.edit-col-btn').forEach(btn => {
+      btn.addEventListener('click', e => { e.stopPropagation(); renomearColuna(btn.dataset.col); });
     });
     setupColDrag(thead);
 
@@ -774,6 +778,68 @@ function montarDistribuicao(container, secao) {
       },
       'Adicionar'
     );
+  }
+
+  /**
+   * Renomear é reescrever: o nome da coluna é a CHAVE dentro de
+   * `{colMensal}/{mes}.colunas`, então trocar o nome exige reescrever todos
+   * os meses lançados. O histórico inteiro passa a exibir o nome novo.
+   */
+  function renomearColuna(nomeAtual) {
+    openModal(
+      `Renomear coluna "${esc(nomeAtual)}"`,
+      `<div class="form-group">
+         <label>Novo nome</label>
+         <input type="text" id="cx-ren-col" maxlength="40" autocomplete="off">
+       </div>
+       <p class="form-hint">O nome da coluna é a chave usada em cada mês, então renomear
+       <strong>reescreve todos os meses já lançados</strong> — o histórico inteiro passa a
+       exibir o nome novo. Os valores não mudam.</p>`,
+      async () => {
+        const novo = document.getElementById('cx-ren-col').value.trim();
+        if (!novo)              { showToast('Nome inválido.', 'error'); return; }
+        if (novo === nomeAtual) return;
+        if (colunas.includes(novo)) { showToast('Já existe uma coluna com esse nome.', 'error'); return; }
+
+        const ocupados = Object.keys(meses).filter(id => meses[id]?.colunas?.[novo] !== undefined);
+        if (ocupados.length) {
+          showToast(`Já há lançamentos com o nome "${novo}" em ${ocupados.length} mês(es). Escolha outro nome.`, 'error');
+          return;
+        }
+
+        const alvos = Object.keys(meses).filter(id => meses[id]?.colunas?.[nomeAtual] !== undefined);
+        try {
+          // Grava o mapa `colunas` inteiro em vez de caminho de campo
+          // (`colunas.${novo}`): nome com ponto viraria campo aninhado.
+          const LOTE = 400;   // batch do Firestore aceita 500 operações
+          for (let i = 0; i < alvos.length; i += LOTE) {
+            const batch = writeBatch(db);
+            alvos.slice(i, i + LOTE).forEach(mesId => {
+              const cols = { ...meses[mesId].colunas };
+              cols[novo] = cols[nomeAtual];
+              delete cols[nomeAtual];
+              batch.update(doc(db, colMensal, mesId), { colunas: cols });
+            });
+            await batch.commit();
+          }
+
+          // Config por último: é ela que define as colunas da tabela. Se um
+          // lote falhar, o nome antigo continua valendo e a tela segue
+          // coerente, em vez de apontar para uma chave parcial.
+          await setDoc(doc(db, 'config', colConfig), {
+            colunas: colunas.map(c => (c === nomeAtual ? novo : c))
+          });
+          showToast(`Coluna renomeada para "${novo}".`, 'success');
+        } catch {
+          showToast('Erro ao renomear a coluna.', 'error');
+        }
+      },
+      'Renomear'
+    );
+
+    // Por JS, não no atributo value: nome de coluna pode conter aspas.
+    const input = document.getElementById('cx-ren-col');
+    if (input) { input.value = nomeAtual; input.select(); }
   }
 
   function removerColuna(nome) {

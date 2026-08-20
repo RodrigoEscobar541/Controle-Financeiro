@@ -19,7 +19,7 @@
 import { db } from './firebase-config.js';
 import { fmtBRL, mesAtualId, idToLabel, showToast, openModal } from './app.js';
 import {
-  collection, doc, setDoc, onSnapshot
+  collection, doc, setDoc, onSnapshot, writeBatch
 } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
 
 let colunas    = [];
@@ -86,6 +86,7 @@ function renderTabela() {
   const thCols = colunas.map(col => `
     <th draggable="true" data-col="${col}">
       <span class="col-name">${col}</span>
+      <span class="edit-col-btn" data-col="${col}" title="Renomear coluna" draggable="false">✏️</span>
       <span class="delete-col-btn" data-col="${col}" title="Remover coluna" draggable="false">✕</span>
     </th>
   `).join('');
@@ -93,6 +94,10 @@ function renderTabela() {
 
   thead.querySelectorAll('.delete-col-btn').forEach(btn => {
     btn.addEventListener('click', e => { e.stopPropagation(); removerColuna(btn.dataset.col); });
+  });
+
+  thead.querySelectorAll('.edit-col-btn').forEach(btn => {
+    btn.addEventListener('click', e => { e.stopPropagation(); renomearColuna(btn.dataset.col); });
   });
 
   setupColDrag(thead);
@@ -318,6 +323,84 @@ function adicionarColuna() {
     },
     'Adicionar'
   );
+}
+
+// ────────────────────────────────────────────
+// RENOMEAR COLUNA
+// ────────────────────────────────────────────
+/**
+ * O nome da coluna não é um rótulo: é a CHAVE dentro de
+ * `distribuicao_mensal/{mes}.colunas`. Renomear, portanto, não é editar um
+ * texto — é reescrever todos os meses já lançados. Por isso o aviso explícito
+ * no modal: o histórico inteiro passa a exibir o nome novo, não só dali pra
+ * frente.
+ */
+function renomearColuna(nomeAtual) {
+  openModal(
+    `Renomear coluna "${nomeAtual}"`,
+    `<div class="form-group">
+       <label>Novo nome</label>
+       <input type="text" id="ren-col-input" maxlength="40" autocomplete="off">
+     </div>
+     <p class="form-hint">O nome da coluna é a chave usada em cada mês, então renomear
+     <strong>reescreve todos os meses já lançados</strong> — o histórico inteiro passa a
+     exibir o nome novo. Os valores não mudam.</p>`,
+    async () => {
+      const novo = document.getElementById('ren-col-input').value.trim();
+      if (!novo)               { showToast('Nome inválido.', 'error'); return; }
+      if (novo === nomeAtual)  return;
+      if (colunas.includes(novo)) { showToast('Já existe uma coluna com esse nome.', 'error'); return; }
+
+      // Remover uma coluna só a tira da config — os valores continuam nos
+      // meses. Se o nome novo for um desses órfãos, renomear sobrescreveria
+      // lançamentos antigos sem aviso. Melhor recusar do que apagar.
+      const orfaos = Object.keys(meses).filter(id => meses[id]?.colunas?.[novo] !== undefined);
+      if (orfaos.length) {
+        showToast(`Já houve uma coluna "${novo}" com valores em ${orfaos.length} mês(es). Escolha outro nome.`, 'error');
+        return;
+      }
+
+      try {
+        await aplicarRenomeacao(nomeAtual, novo);
+        showToast(`Coluna renomeada para "${novo}".`, 'success');
+      } catch {
+        showToast('Erro ao renomear a coluna.', 'error');
+      }
+    },
+    'Renomear'
+  );
+
+  // Preenchido por JS, não no HTML: nome de coluna pode conter aspas e
+  // quebraria o atributo value.
+  const input = document.getElementById('ren-col-input');
+  if (input) { input.value = nomeAtual; input.select(); }
+}
+
+async function aplicarRenomeacao(antigo, novo) {
+  const alvos = Object.keys(meses).filter(id => meses[id]?.colunas?.[antigo] !== undefined);
+
+  // Grava o mapa `colunas` inteiro em vez de usar caminho de campo
+  // (`colunas.${novo}`): nome com ponto viraria campo aninhado e corromperia
+  // o documento. Reescrever o mapa preserva inclusive as colunas órfãs.
+  const LOTE = 400;   // batch do Firestore aceita 500 operações
+  for (let i = 0; i < alvos.length; i += LOTE) {
+    const batch = writeBatch(db);
+    alvos.slice(i, i + LOTE).forEach(mesId => {
+      const cols = { ...meses[mesId].colunas };
+      cols[novo] = cols[antigo];
+      delete cols[antigo];
+      batch.update(doc(db, 'distribuicao_mensal', mesId), { colunas: cols });
+    });
+    await batch.commit();
+  }
+
+  // A config vai por ÚLTIMO, e de propósito: ela é o que a tabela lê para
+  // montar as colunas. Se algum lote acima falhar, o nome antigo continua
+  // valendo e a tela segue coerente — em vez de exibir um nome cuja chave
+  // só existe em parte dos meses.
+  await setDoc(doc(db, 'config', 'distribuicao_colunas'), {
+    colunas: colunas.map(c => (c === antigo ? novo : c))
+  });
 }
 
 function removerColuna(nome) {
