@@ -289,15 +289,32 @@ function escApp(str) {
 }
 
 async function carregarConfiguracaoSections() {
-  try {
-    secoesOcultas = await carregarSecoesOcultas();
-    aplicarVisibilidadeFixas();
-  } catch { /* mantém tudo visível se a leitura falhar */ }
+  // `secoes_ocultas` é preferência do admin e mora num documento que só o
+  // admin pode ler — nem tentamos a leitura como convidado, para não gerar
+  // um erro de permissão garantido no console.
+  if (ehAdmin()) {
+    try {
+      secoesOcultas = await carregarSecoesOcultas();
+    } catch { secoesOcultas = []; }
+  } else {
+    secoesOcultas = [];
+  }
 
-  try {
-    const secoes = await carregarSecoesCustomizadas();
-    secoes.filter(s => s.ativo).forEach(registrarSecaoCustomizadaNoDOM);
-  } catch { /* sem sections customizadas cadastradas ainda */ }
+  // FORA do try, e sempre. Já esteve dentro dele: como a leitura acima falha
+  // para convidado, o catch pulava a filtragem inteira e a pessoa via o menu
+  // completo — sections a que não tem acesso nenhum incluídas. Falhar ao ler
+  // uma preferência não pode significar "mostre tudo".
+  aplicarVisibilidadeFixas();
+
+  // Sections customizadas são administração: só o admin as vê, e só ele pode
+  // ler a coleção. Aqui o catch é seguro — falhar significa não acrescentar
+  // nada ao menu, que é o lado certo de errar.
+  if (ehAdmin()) {
+    try {
+      const secoes = await carregarSecoesCustomizadas();
+      secoes.filter(s => s.ativo).forEach(registrarSecaoCustomizadaNoDOM);
+    } catch { /* sem sections customizadas cadastradas ainda */ }
+  }
 
   montarGrupoBella();
 }
