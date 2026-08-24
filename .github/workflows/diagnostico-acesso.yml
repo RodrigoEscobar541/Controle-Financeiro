@@ -1,0 +1,30 @@
+name: Diagnóstico de acesso (one-off)
+
+# Roda "Bot Render/scripts/definir-acesso.js listar" sob demanda — só LEITURA,
+# não altera nada. Serve para conferir quem está marcado como admin e o que
+# cada convidado enxerga, sem precisar de terminal/SSH.
+
+on:
+  workflow_dispatch:
+
+jobs:
+  listar:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout do repositório
+        uses: actions/checkout@v4
+
+      - name: Configurar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Instalar dependências do bot
+        working-directory: Bot Render
+        run: npm install --omit=dev
+
+      - name: Listar acessos
+        working-directory: Bot Render
+        env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+        run: node scripts/definir-acesso.js listar
