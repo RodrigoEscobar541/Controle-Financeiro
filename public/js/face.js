@@ -31,6 +31,9 @@ let unsubDados            = null;
 let feitosVisiveis        = 5;
 let abastecimentoVisiveis = 1;
 let mostrarAntigos        = false;
+// Total gasto de TODOS os feitos, sem o corte de 1 ano — o corte é só da LISTA.
+// Somar a lista cortada fazia o total mudar ao clicar em "Carregar histórico completo".
+let totalFeitos           = 0;
 
 const LS_VALOR_PAGO = 'tf_valorPago_face';
 
@@ -68,8 +71,9 @@ function recalcular() {
     .sort((a, b) => (parseFloat(a.prioridade) || 0) - (parseFloat(b.prioridade) || 0));
 
   const corte = mostrarAntigos ? null : corteUmAno();
-  feitos = docsRaw
-    .filter(d => d.tipo === 'feito')
+  const todosFeitos = docsRaw.filter(d => d.tipo === 'feito');
+  totalFeitos = todosFeitos.reduce((acc, d) => acc + (parseFloat(d.valor) || 0), 0);
+  feitos = todosFeitos
     .filter(d => !corte || (d.data || '') >= corte)
     .sort((a, b) => String(b.data || '').localeCompare(String(a.data || '')));
 
@@ -164,14 +168,12 @@ function renderFeitos() {
   const tbody   = document.querySelector('#face-feitos-table tbody');
   const totalEl = document.getElementById('face-feitos-total');
 
+  totalEl.textContent = fmtBRL(totalFeitos);
+
   if (feitos.length === 0) {
     tbody.innerHTML = `<tr><td colspan="4" class="empty-state">Nenhuma manutenção registrada.</td></tr>`;
-    totalEl.textContent = 'R$ 0,00';
     return;
   }
-
-  let total = 0;
-  feitos.forEach(item => { total += parseFloat(item.valor) || 0; });
 
   const visiveis = feitos.slice(0, feitosVisiveis);
 
@@ -199,8 +201,6 @@ function renderFeitos() {
       </td>
     </tr>`;
   }
-
-  totalEl.textContent = fmtBRL(total);
 
   tbody.querySelectorAll('[data-action="edit"]').forEach(btn => {
     btn.addEventListener('click', () => {
